@@ -1210,6 +1210,5 @@ window.validateAddressInput = validateAddressInput;
 window.confirmSend = confirmSend;
 window.closePopup = closePopup;
 window.lookupTransactions = lookupTransactions;
-window.sendXRPReference = sendXRPReference;
 window.getWalletFromPrivateKey = getWalletFromPrivateKey;
 window.convertWIFtoRippleWallet = convertWIFtoRippleWallet;

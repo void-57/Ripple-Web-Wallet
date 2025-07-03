@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ripple Wallet</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💰</text></svg>"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="css/main.css" />
+
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/xrpl@2.7.0/build/xrpl-latest-min.js"></script>
+    <script src="https://unpkg.com/uhtml@4.5.11/uhtml.js"></script>
+    <script src="https://unpkg.com/@preact/signals-core@1.7.0/dist/signals-core.min.js"></script>
+  </head>
+  <body class="hidden">
+    <!-- Loading Screen -->
+    <div id="loading_page" class="loading-screen">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <h2>Ripple Wallet</h2>
+        <p>Loading...</p>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="hamburger-btn" id="hamburgerBtn">
+          <i class="fas fa-bars"></i>
+        </button>
+        <div class="mobile-title">
+          <i class="fas fa-wallet"></i>
+          <span>Ripple Wallet</span>
+        </div>
+        <div class="header-actions">
+          <button
+            id="themeToggle"
+            class="theme-toggle"
+            title="Toggle dark/light mode"
+          >
+            <i class="fas fa-sun" id="themeIcon"></i>
+          </button>
+          <div class="wallet-balance">
+            <span id="walletBalance">0 XRP</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Main Container -->
+    <div class="container">
+      <!-- Sidebar Navigation -->
+      <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <i class="fas fa-wallet"></i>
+          <h3>Ripple Wallet</h3>
+        </div>
+        <ul class="sidebar-menu">
+          <li>
+            <a
+              href="#"
+              onclick="showPage('connectPage')"
+              class="nav-link active"
+            >
+              <i class="fas fa-plug"></i> Connect Wallet
+            </a>
+          </li>
+          <li>
+            <a href="#" onclick="showPage('sendPage')" class="nav-link">
+              <i class="fas fa-paper-plane"></i> Send XRP
+            </a>
+          </li>
+          <li>
+            <a href="#" onclick="showPage('lookupPage')" class="nav-link">
+              <i class="fas fa-search"></i> Transaction Lookup
+            </a>
+          </li>
+          <li>
+            <a href="#" onclick="showPage('generatePage')" class="nav-link">
+              <i class="fas fa-plus-circle"></i> Generate Wallet
+            </a>
+          </li>
+          <li>
+            <a href="#" onclick="showPage('recoverPage')" class="nav-link">
+              <i class="fas fa-key"></i> Recover Wallet
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Main Content Area -->
+      <main class="main-content">
+        <!-- Connect Wallet Page -->
+        <div id="connectPage" class="page">
+          <div class="page-header">
+            <h2><i class="fas fa-plug"></i> Connect Wallet</h2>
+            <p>
+              Connect your wallet using your private key or seed (NOT your
+              address)
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="form-group">
+              <label for="inputKey">
+                <i class="fas fa-key"></i> Private Key / Seed
+              </label>
+              <input
+                type="password"
+                id="inputKey"
+                class="form-input"
+                placeholder="Enter private key or seed (s..., L..., K...) "
+                autocomplete="off"
+              />
+              <div class="input-help">
+                Enter your private key or seed, NOT a wallet address. Supports
+                Ripple seeds (s...), Bitcoin WIF (L.../K...), and FLO WIF
+                formats.
+              </div>
+            </div>
+
+            <button onclick="connectWallet()" class="btn btn-primary btn-block">
+              <i class="fas fa-link"></i> Connect Wallet
+            </button>
+          </div>
+
+          <!-- Wallet Info Display -->
+          <div class="card wallet-info" id="walletInfo" style="display: none">
+            <div class="wallet-header">
+              <h3><i class="fas fa-wallet"></i> Wallet Connected</h3>
+              <div class="balance-display">
+                <span class="balance-amount" id="displayBalance">0 XRP</span>
+              </div>
+            </div>
+            <div class="wallet-address">
+              <label>Wallet Address:</label>
+              <div class="address-container">
+                <span id="walletAddress" class="address-text"
+                  >Not connected</span
+                >
+                <button
+                  onclick="copyAddress()"
+                  class="btn-icon"
+                  title="Copy Address"
+                >
+                  <i class="fas fa-copy"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Send XRP Page -->
+        <div id="sendPage" class="page hidden">
+          <div class="page-header">
+            <h2><i class="fas fa-paper-plane"></i> Send XRP</h2>
+            <p>Send XRP to another Ripple address</p>
+          </div>
+
+          <div class="card">
+            <div class="form-group">
+              <label for="sendKey">
+                <i class="fas fa-key"></i> Your Private Key
+              </label>
+              <input
+                type="password"
+                id="sendKey"
+                class="form-input"
+                placeholder="Enter your private key or seed"
+                autocomplete="off"
+              />
+              <div class="input-help">
+                Use your Ripple seed (s...), WIF private key (L.../K...), or hex
+                private key (64 characters)
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="recipient">
+                <i class="fas fa-user"></i> Recipient Address
+              </label>
+              <input
+                type="text"
+                id="recipient"
+                class="form-input"
+                placeholder="Enter Ripple address (r...)"
+              />
+              <small class="help-text"
+                >Enter a valid Ripple address starting with 'r' (25-34
+                characters)</small
+              >
+            </div>
+
+            <div class="form-group">
+              <label for="amount">
+                <i class="fas fa-coins"></i> Amount (XRP)
+              </label>
+              <input
+                type="number"
+                id="amount"
+                class="form-input"
+                placeholder="0.00"
+                step="0.000001"
+                min="0.000001"
+              />
+              <div class="input-help">Minimum: 0.000001 XRP</div>
+            </div>
+
+            <button onclick="sendXRP()" class="btn btn-primary btn-block">
+              <i class="fas fa-paper-plane"></i> Send XRP
+            </button>
+          </div>
+        </div>
+
+        <!-- Transaction Lookup Page -->
+        <div id="lookupPage" class="page hidden">
+          <div class="page-header">
+            <h2><i class="fas fa-search"></i> Transaction Lookup</h2>
+            <p>Search transaction history for any Ripple address</p>
+          </div>
+
+          <div class="card">
+            <div class="form-group">
+              <label for="lookupAddress">
+                <i class="fas fa-search"></i> Ripple Address
+              </label>
+              <div class="input-group">
+                <input
+                  type="text"
+                  id="lookupAddress"
+                  class="form-input"
+                  placeholder="Enter Ripple address (r...)"
+                />
+                <button onclick="lookupTransactions()" class="btn btn-primary">
+                  <i class="fas fa-search"></i> Search
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transaction Results -->
+          <div id="txList" class="transaction-list">
+            <!-- Transaction cards will be inserted here -->
+          </div>
+        </div>
+
+        <!-- Generate Wallet Page -->
+        <div id="generatePage" class="page hidden">
+          <div class="page-header">
+            <h2><i class="fas fa-plus-circle"></i> Generate New Wallet</h2>
+            <p>Create a new multi-chain wallet (Ripple, Bitcoin, FLO)</p>
+          </div>
+
+          <div class="card">
+            <div class="generate-info">
+              <div class="info-item">
+                <i class="fas fa-shield-alt"></i>
+                <div>
+                  <h4>Secure Generation</h4>
+                  <p>Uses cryptographically secure random number generation</p>
+                </div>
+              </div>
+              <div class="info-item">
+                <i class="fas fa-link"></i>
+                <div>
+                  <h4>Multi-Chain Support</h4>
+                  <p>
+                    Generate compatible addresses for Ripple, Bitcoin, and FLO
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onclick="generateWallet()"
+              class="btn btn-primary btn-block"
+            >
+              <i class="fas fa-plus-circle"></i> Generate New Wallet
+            </button>
+          </div>
+
+          <!-- Generated Wallet Output -->
+          <div id="walletOutput" class="card output-card" style="display: none">
+            <!-- Generated wallet info will be inserted here -->
+          </div>
+        </div>
+
+        <!-- Recover Wallet Page -->
+        <div id="recoverPage" class="page hidden">
+          <div class="page-header">
+            <h2><i class="fas fa-key"></i> Recover Wallet</h2>
+            <p>
+              Recover wallet details from your private key or seed (NOT your
+              address)
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="form-group">
+              <label for="recoverKey">
+                <i class="fas fa-key"></i> Private Key
+              </label>
+              <input
+                type="password"
+                id="recoverKey"
+                class="form-input"
+                placeholder="Enter private key or seed (s..., L..., K...)"
+                autocomplete="off"
+              />
+              <div class="input-help">
+                Enter your private key or seed. Supports Ripple seeds (s...),
+                Bitcoin WIF (L.../K...), FLO WIF, or hex private keys.
+              </div>
+            </div>
+
+            <div class="input-group">
+              <button onclick="recoverWallet()" class="btn btn-primary">
+                <i class="fas fa-search"></i> Recover Wallet
+              </button>
+              <button onclick="clearRecoverForm()" class="btn btn-secondary">
+                <i class="fas fa-trash"></i> Clear
+              </button>
+            </div>
+          </div>
+
+          <!-- Recovery Output -->
+          <div
+            id="recoveryOutput"
+            class="card output-card"
+            style="display: none"
+          >
+            <!-- Recovery info will be inserted here -->
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Bottom Navigation (Mobile) -->
+    <div class="nav-box">
+      <button
+        onclick="showPage('connectPage')"
+        class="nav-btn active"
+        data-page="connectPage"
+      >
+        <i class="fas fa-plug"></i>
+        <span>Connect</span>
+      </button>
+      <button
+        onclick="showPage('sendPage')"
+        class="nav-btn"
+        data-page="sendPage"
+      >
+        <i class="fas fa-paper-plane"></i>
+        <span>Send</span>
+      </button>
+      <button
+        onclick="showPage('lookupPage')"
+        class="nav-btn"
+        data-page="lookupPage"
+      >
+        <i class="fas fa-search"></i>
+        <span>Lookup</span>
+      </button>
+      <button
+        onclick="showPage('generatePage')"
+        class="nav-btn"
+        data-page="generatePage"
+      >
+        <i class="fas fa-plus"></i>
+        <span>Generate</span>
+      </button>
+    </div>
+
+    <!-- Confirmation Popup -->
+    <sm-popup id="sendConfirm">
+      <div slot="header">
+        <h3><i class="fas fa-exclamation-triangle"></i> Confirm Transaction</h3>
+      </div>
+      <div class="popup-content">
+        <p>
+          Please review the transaction details below and confirm to proceed:
+        </p>
+        <div class="transaction-details" id="transactionDetails">
+          <!-- Transaction details will be populated here -->
+        </div>
+        <div class="popup-actions">
+          <button onclick="closePopup()" class="btn btn-secondary">
+            Cancel
+          </button>
+          <button onclick="confirmSend()" class="btn btn-primary">
+            <i class="fas fa-paper-plane"></i> Send Transaction
+          </button>
+        </div>
+      </div>
+    </sm-popup>
+
+    <!-- Standard UI Notifications -->
+    <sm-notifications id="notification_drawer"></sm-notifications>
+
+    <!-- Confirmation Popup -->
+    <sm-popup id="confirmation_popup">
+      <div class="popup-content">
+        <h3 id="confirm_title">Confirm Action</h3>
+        <div id="confirm_message"></div>
+        <div class="popup-actions">
+          <button class="btn btn-secondary cancel-button">Cancel</button>
+          <button class="btn btn-primary confirm-button">OK</button>
+        </div>
+      </div>
+    </sm-popup>
+
+    <!-- Scripts -->
+    <script src="scripts/components.min.js"></script>
+    <script type="module" src="wallet.js"></script>
+    <script>
+      // UI Enhancement Functions
+      function showPage(pageId) {
+        // Hide all pages
+        document.querySelectorAll(".page").forEach((page) => {
+          page.classList.add("hidden");
+        });
+
+        // Show selected page
+        document.getElementById(pageId).classList.remove("hidden");
+
+        // Update navigation states
+        updateNavigation(pageId);
+
+        // Close sidebar on mobile
+        if (window.innerWidth <= 768) {
+          document.getElementById("sidebar").classList.remove("active");
+          document.getElementById("sidebarOverlay").classList.remove("active");
+        }
+      }
+
+      function updateNavigation(activePageId) {
+        // Update sidebar navigation - remove active from all first
+        document.querySelectorAll(".sidebar .nav-link").forEach((link) => {
+          link.classList.remove("active");
+        });
+
+        // Update bottom navigation
+        document.querySelectorAll(".nav-btn").forEach((btn) => {
+          btn.classList.remove("active");
+          if (btn.dataset.page === activePageId) {
+            btn.classList.add("active");
+          }
+        });
+
+        // Find and activate corresponding sidebar link
+        const activeLink = document.querySelector(
+          `.sidebar .nav-link[onclick*="${activePageId}"]`
+        );
+        if (activeLink) {
+          activeLink.classList.add("active");
+        }
+      }
+
+      // Close sidebar when clicking overlay
+      document
+        .getElementById("sidebarOverlay")
+        .addEventListener("click", function () {
+          document.getElementById("sidebar").classList.remove("active");
+          this.classList.remove("active");
+        });
+
+      // Hamburger menu functionality
+      document
+        .getElementById("hamburgerBtn")
+        .addEventListener("click", function () {
+          const sidebar = document.getElementById("sidebar");
+          const overlay = document.getElementById("sidebarOverlay");
+
+          sidebar.classList.toggle("active");
+          overlay.classList.toggle("active");
+        });
+
+      // Theme toggle functionality
+      function initializeTheme() {
+        const themeToggle = document.getElementById("themeToggle");
+        const themeIcon = document.getElementById("themeIcon");
+        const body = document.body;
+
+        // Check for saved theme preference or default to 'light'
+        const savedTheme = localStorage.getItem("theme");
+        const systemPrefersDark = window.matchMedia(
+          "(prefers-color-scheme: dark)"
+        ).matches;
+
+        // Set initial theme
+        let currentTheme = savedTheme || (systemPrefersDark ? "dark" : "light");
+
+        // Apply theme
+        body.setAttribute("data-theme", currentTheme);
+        updateThemeIcon(currentTheme);
+
+        // Add event listener for theme toggle
+        themeToggle.addEventListener("click", () => {
+          currentTheme = currentTheme === "light" ? "dark" : "light";
+          body.setAttribute("data-theme", currentTheme);
+          localStorage.setItem("theme", currentTheme);
+          updateThemeIcon(currentTheme);
+          notify(`Switched to ${currentTheme} mode`, "success");
+        });
+      }
+
+      function updateThemeIcon(theme) {
+        const themeIcon = document.getElementById("themeIcon");
+        if (theme === "dark") {
+          themeIcon.className = "fas fa-moon";
+        } else {
+          themeIcon.className = "fas fa-sun";
+        }
+      }
+
+      // Initialize theme when DOM is loaded
+      document.addEventListener("DOMContentLoaded", function () {
+        initializeTheme();
+
+        // Add real-time validation for recipient address
+        const recipientInput = document.getElementById("recipient");
+        const helpText = recipientInput
+          ? recipientInput.nextElementSibling
+          : null;
+
+        if (recipientInput && helpText) {
+          recipientInput.addEventListener("input", function () {
+            const address = this.value.trim();
+            if (address && typeof validateAddressInput === "function") {
+              const validation = validateAddressInput(address);
+              if (validation.valid) {
+                helpText.textContent = "✓ Valid Ripple address";
+                helpText.style.color = "#22c55e";
+              } else {
+                helpText.textContent = validation.message;
+                helpText.style.color = "#ef4444";
+              }
+            } else {
+              helpText.textContent =
+                "Enter a valid Ripple address starting with 'r' (25-34 characters)";
+              helpText.style.color = "";
+            }
+          });
+        }
+      });
+    </script>
+  </body>
+</html>

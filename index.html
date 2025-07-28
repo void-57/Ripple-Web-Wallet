@@ -18,6 +18,8 @@
     <script src="https://cdn.jsdelivr.net/npm/xrpl@2.7.0/build/xrpl-latest-min.js"></script>
     <script src="https://unpkg.com/uhtml@4.5.11/uhtml.js"></script>
     <script src="https://unpkg.com/@preact/signals-core@1.7.0/dist/signals-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.6.1/elliptic.min.js"></script>
+  
   </head>
   <body class="hidden">
     <!-- Loading Screen -->
@@ -32,9 +34,6 @@
     <!-- Header -->
     <header class="header">
       <div class="header-content">
-        <button class="hamburger-btn" id="hamburgerBtn">
-          <i class="fas fa-bars"></i>
-        </button>
         <div class="mobile-title">
           <i class="fas fa-wallet"></i>
           <span>Ripple Wallet</span>
@@ -47,15 +46,9 @@
           >
             <i class="fas fa-sun" id="themeIcon"></i>
           </button>
-          <div class="wallet-balance">
-            <span id="walletBalance">0 XRP</span>
-          </div>
         </div>
       </div>
     </header>
-
-    <!-- Sidebar Overlay -->
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
     <!-- Main Container -->
     <div class="container">
@@ -72,7 +65,7 @@
               onclick="showPage('connectPage')"
               class="nav-link active"
             >
-              <i class="fas fa-plug"></i> Connect Wallet
+              <i class="fas fa-search-dollar"></i> Check Balance
             </a>
           </li>
           <li>
@@ -87,12 +80,12 @@
           </li>
           <li>
             <a href="#" onclick="showPage('generatePage')" class="nav-link">
-              <i class="fas fa-plus-circle"></i> Generate Wallet
+              <i class="fas fa-plus-circle"></i> Generate Address
             </a>
           </li>
           <li>
             <a href="#" onclick="showPage('recoverPage')" class="nav-link">
-              <i class="fas fa-key"></i> Recover Wallet
+              <i class="fas fa-key"></i> Retrieve Address
             </a>
           </li>
         </ul>
@@ -100,61 +93,57 @@
 
       <!-- Main Content Area -->
       <main class="main-content">
-        <!-- Connect Wallet Page -->
+        <!-- Check Balance Page -->
         <div id="connectPage" class="page">
           <div class="page-header">
-            <h2><i class="fas fa-plug"></i> Connect Wallet</h2>
-            <p>
-              Connect your wallet using your private key or seed (NOT your
-              address)
-            </p>
+            <h2><i class="fas fa-search-dollar"></i> Check Balance</h2>
+            <p>Check the XRP balance for any Ripple address</p>
           </div>
 
           <div class="card">
             <div class="form-group">
-              <label for="inputKey">
-                <i class="fas fa-key"></i> Private Key / Seed
+              <label for="checkAddress">
+                <i class="fas fa-wallet"></i> Ripple Address
               </label>
               <input
-                type="password"
-                id="inputKey"
+                type="text"
+                id="checkAddress"
                 class="form-input"
-                placeholder="Enter private key or seed (s..., L..., K...) "
+                placeholder="Enter Ripple address (r...)"
                 autocomplete="off"
               />
               <div class="input-help">
-                Enter your private key or seed, NOT a wallet address. Supports
-                Ripple seeds (s...), Bitcoin WIF (L.../K...), and FLO WIF
-                formats.
+                Enter any Ripple address to check its XRP balance and account
+                details
               </div>
             </div>
 
-            <button onclick="connectWallet()" class="btn btn-primary btn-block">
-              <i class="fas fa-link"></i> Connect Wallet
+            <button onclick="checkBalance()" class="btn btn-primary btn-block">
+              <i class="fas fa-search-dollar"></i> Check Balance
             </button>
           </div>
 
-          <!-- Wallet Info Display -->
-          <div class="card wallet-info" id="walletInfo" style="display: none">
-            <div class="wallet-header">
-              <h3><i class="fas fa-wallet"></i> Wallet Connected</h3>
+          <!-- Balance Info Display -->
+          <div class="card balance-info" id="balanceInfo" style="display: none">
+            <div class="balance-header">
+              <h3><i class="fas fa-coins"></i> Account Balance</h3>
               <div class="balance-display">
                 <span class="balance-amount" id="displayBalance">0 XRP</span>
               </div>
             </div>
-            <div class="wallet-address">
-              <label>Wallet Address:</label>
-              <div class="address-container">
-                <span id="walletAddress" class="address-text"
-                  >Not connected</span
-                >
-                <button
-                  onclick="copyAddress()"
-                  class="btn-icon"
-                  title="Copy Address"
-                >
-                  <i class="fas fa-copy"></i>
-                </button>
+            <div class="account-details">
+              <div class="detail-row">
+                <label>Address:</label>
+                <div class="address-container">
+                  <span id="checkedAddress" class="address-text">-</span>
+                  <button
+                    onclick="copyAddress()"
+                    class="btn-icon"
+                    title="Copy Address"
+                  >
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -254,92 +243,124 @@
           </div>
         </div>
 
-        <!-- Generate Wallet Page -->
+        <!-- Generate Address Page -->
         <div id="generatePage" class="page hidden">
           <div class="page-header">
-            <h2><i class="fas fa-plus-circle"></i> Generate New Wallet</h2>
-            <p>Create a new multi-chain wallet (Ripple, Bitcoin, FLO)</p>
+            <h2><i class="fas fa-plus-circle"></i> Generate XRP Address</h2>
+            <p>Generate XRP addresses from private keys of any blockchain</p>
           </div>
 
           <div class="card">
-            <div class="generate-info">
-              <div class="info-item">
-                <i class="fas fa-shield-alt"></i>
-                <div>
-                  <h4>Secure Generation</h4>
-                  <p>Uses cryptographically secure random number generation</p>
-                </div>
-              </div>
-              <div class="info-item">
-                <i class="fas fa-link"></i>
-                <div>
-                  <h4>Multi-Chain Support</h4>
-                  <p>
-                    Generate compatible addresses for Ripple, Bitcoin, and FLO
-                  </p>
-                </div>
-              </div>
+            <!-- Private Key Input for XRP Generation -->
+            <div class="form-group">
+              <label for="generateKey">
+                <i class="fas fa-key"></i> Private Key (Required for XRP)
+              </label>
+              <input
+                type="password"
+                id="generateKey"
+                placeholder="Enter private key from any blockchain (BTC/FLO/ETH/SOL/BNB/MATIC)"
+                class="form-input"
+              />
+              <small class="form-text">
+                Enter a private key from any blockchain
+                (BTC/FLO/ETH/SOL/BNB/MATIC) to generate the corresponding XRP
+                address.
+              </small>
             </div>
 
-            <button
-              onclick="generateWallet()"
-              class="btn btn-primary btn-block"
+            <div class="generate-actions">
+              <button
+                onclick="generateXRPAddress()"
+                class="btn btn-primary btn-block generate-btn"
+              >
+                <i class="fas fa-coins"></i> Generate XRP Address
+              </button>
+            </div>
+
+            <!-- XRP Generation Info -->
+            <div
+              id="xrpGenerationInfo"
+              class="card info-card"
+              style="display: none"
             >
-              <i class="fas fa-plus-circle"></i> Generate New Wallet
-            </button>
+              <div class="info-header">
+                <h3>
+                  <i class="fas fa-info-circle"></i> XRP Address Generation
+                </h3>
+              </div>
+              <div class="info-content">
+                <p>
+                  <strong>Note:</strong> This wallet doesn't generate XRP
+                  addresses directly.
+                </p>
+                <p>To get an XRP address, please:</p>
+                <ol>
+                  <li>Use our BTC wallet to generate a BTC private key</li>
+                  <li>
+                    Convert that BTC/FLO private key to Ripple seed using the
+                    conversion tool below
+                  </li>
+                </ol>
+                <button
+                  onclick="showPage('convertPage')"
+                  class="btn btn-primary"
+                >
+                  <i class="fas fa-exchange-alt"></i> Go to Conversion Tool
+                </button>
+              </div>
+            </div>
           </div>
 
-          <!-- Generated Wallet Output -->
+          <!-- Generated Address Output -->
           <div id="walletOutput" class="card output-card" style="display: none">
-            <!-- Generated wallet info will be inserted here -->
+            <!-- Generated address info will be inserted here -->
           </div>
         </div>
 
-        <!-- Recover Wallet Page -->
+        <!-- Retrieve Address Page -->
         <div id="recoverPage" class="page hidden">
           <div class="page-header">
-            <h2><i class="fas fa-key"></i> Recover Wallet</h2>
-            <p>
-              Recover wallet details from your private key or seed (NOT your
-              address)
-            </p>
+            <h2><i class="fas fa-key"></i> Retrieve XRP Address</h2>
+            <p>Retrieve your XRP address from any blockchain private key</p>
           </div>
 
           <div class="card">
             <div class="form-group">
               <label for="recoverKey">
-                <i class="fas fa-key"></i> Private Key
+                <i class="fas fa-key"></i> Private Key / Seed
               </label>
               <input
                 type="password"
                 id="recoverKey"
                 class="form-input"
-                placeholder="Enter private key or seed (s..., L..., K...)"
+                placeholder="Enter private key or seed"
                 autocomplete="off"
               />
               <div class="input-help">
-                Enter your private key or seed. Supports Ripple seeds (s...),
-                Bitcoin WIF (L.../K...), FLO WIF, or hex private keys.
+                Enter your private key from any blockchain
+                (BTC/FLO/ETH/SOL/BNB/MATIC) or XRP seed to retrieve your XRP
+                address.
               </div>
             </div>
 
-            <div class="input-group">
-              <button onclick="recoverWallet()" class="btn btn-primary">
-                <i class="fas fa-search"></i> Recover Wallet
-              </button>
-              <button onclick="clearRecoverForm()" class="btn btn-secondary">
-                <i class="fas fa-trash"></i> Clear
+            <div class="retrieve-actions">
+              <button
+                onclick="retrieveXRPAddress()"
+                class="btn btn-primary btn-block retrieve-btn"
+              >
+                <i class="fas fa-coins"></i> Retrieve XRP Address
               </button>
             </div>
           </div>
 
-          <!-- Recovery Output -->
+          <!-- Retrieved Address Output -->
           <div
             id="recoveryOutput"
             class="card output-card"
             style="display: none"
           >
-            <!-- Recovery info will be inserted here -->
+            <!-- Retrieved address info will be inserted here -->
           </div>
         </div>
       </main>
@@ -352,8 +373,8 @@
         class="nav-btn active"
         data-page="connectPage"
       >
-        <i class="fas fa-plug"></i>
-        <span>Connect</span>
+        <i class="fas fa-search-dollar"></i>
+        <span>Balance</span>
       </button>
       <button
         onclick="showPage('sendPage')"
@@ -378,6 +399,14 @@
       >
         <i class="fas fa-plus"></i>
         <span>Generate</span>
+      </button>
+      <button
+        onclick="showPage('recoverPage')"
+        class="nav-btn"
+        data-page="recoverPage"
+      >
+        <i class="fas fa-key"></i>
+        <span>Retrieve</span>
       </button>
     </div>
 
@@ -435,12 +464,6 @@
 
         // Update navigation states
         updateNavigation(pageId);
-
-        // Close sidebar on mobile
-        if (window.innerWidth <= 768) {
-          document.getElementById("sidebar").classList.remove("active");
-          document.getElementById("sidebarOverlay").classList.remove("active");
-        }
       }
 
       function updateNavigation(activePageId) {
@@ -465,25 +488,6 @@
           activeLink.classList.add("active");
         }
       }
-
-      // Close sidebar when clicking overlay
-      document
-        .getElementById("sidebarOverlay")
-        .addEventListener("click", function () {
-          document.getElementById("sidebar").classList.remove("active");
-          this.classList.remove("active");
-        });
-
-      // Hamburger menu functionality
-      document
-        .getElementById("hamburgerBtn")
-        .addEventListener("click", function () {
-          const sidebar = document.getElementById("sidebar");
-          const overlay = document.getElementById("sidebarOverlay");
-
-          sidebar.classList.toggle("active");
-          overlay.classList.toggle("active");
-        });
 
       // Theme toggle functionality
       function initializeTheme() {

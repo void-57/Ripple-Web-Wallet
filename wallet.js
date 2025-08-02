@@ -1,4 +1,4 @@
-import bs58 from "https://cdn.jsdelivr.net/npm/bs58@6.0.0/+esm";
+import bs58check from "https://cdn.jsdelivr.net/npm/bs58check/+esm";
 const uiGlobals = {};
 
 // Check library availability and log status
@@ -13,8 +13,8 @@ console.log(
 );
 
 console.log(
-  "- bs58:",
-  typeof bs58 !== "undefined" ? "✅ Loaded" : "❌ Missing"
+  "- bs58check:",
+  typeof bs58check !== "undefined" ? "✅ Loaded" : "❌ Missing"
 );
 console.log(
   "- uhtml:",
@@ -426,8 +426,8 @@ function convertWIFtoRippleWallet(wif) {
       throw new Error("XRPL library not loaded. Please refresh the page.");
     }
 
-    // Use bs58 for proper WIF decoding
-    const decoded = bs58.decode(wif);
+    // Use bs58check for proper WIF decoding
+    const decoded = bs58check.decode(wif);
     let keyBuffer = decoded.slice(1); // remove version byte
 
     // Handle compression flag if present
@@ -1273,7 +1273,7 @@ async function generateXRPAddress() {
       ) {
         // Solana private key (Base58 encoded) - convert to hex first
         sourceBlockchain = "Solana";
-        const decoded = bs58.decode(sourcePrivateKey);
+        const decoded = bs58check.decode(sourcePrivateKey);
         const hexKey = Array.from(decoded.slice(0, 32))
           .map((b) => b.toString(16).padStart(2, "0"))
           .join("");
@@ -1468,7 +1468,7 @@ async function retrieveXRPAddress() {
     ) {
       // Solana private key (Base58 encoded) - convert to hex first
       sourceBlockchain = "Solana";
-      const decoded = bs58.decode(sourcePrivateKey);
+      const decoded = bs58check.decode(sourcePrivateKey);
       const hexKey = Array.from(decoded.slice(0, 32))
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");

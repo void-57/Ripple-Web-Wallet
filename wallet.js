@@ -1,25 +1,107 @@
 import bs58check from "https://cdn.jsdelivr.net/npm/bs58check/+esm";
 const uiGlobals = {};
 
-// Check library availability and log status
-console.log("Library Status Check:");
-console.log(
-  "- XRPL:",
-  typeof xrpl !== "undefined" ? "✅ Loaded" : "❌ Missing"
-);
-console.log(
-  "- elliptic:",
-  typeof elliptic !== "undefined" ? "✅ Loaded" : "❌ Missing"
-);
+// IndexedDB for storing searched addresses
+class SearchedAddressDB {
+  constructor() {
+    this.dbName = "RippleWalletDB";
+    this.version = 1;
+    this.storeName = "searchedAddresses";
+    this.db = null;
+  }
 
-console.log(
-  "- bs58check:",
-  typeof bs58check !== "undefined" ? "✅ Loaded" : "❌ Missing"
-);
-console.log(
-  "- uhtml:",
-  typeof uhtml !== "undefined" ? "✅ Loaded" : "❌ Missing"
-);
+  async init() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        this.db = request.result;
+        resolve();
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          const store = db.createObjectStore(this.storeName, {
+            keyPath: "address",
+          });
+          store.createIndex("timestamp", "timestamp", { unique: false });
+        }
+      };
+    });
+  }
+
+  async saveSearchedAddress(address, balance, timestamp = Date.now()) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.storeName], "readwrite");
+      const store = transaction.objectStore(this.storeName);
+
+      const data = {
+        address,
+        balance,
+        timestamp,
+        formattedBalance: `${balance} XRP`,
+      };
+
+      const request = store.put(data);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getSearchedAddresses() {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.storeName], "readonly");
+      const store = transaction.objectStore(this.storeName);
+      const index = store.index("timestamp");
+
+      // Get all records sorted by timestamp (newest first)
+      const request = index.getAll();
+      request.onsuccess = () => {
+        const results = request.result.sort(
+          (a, b) => b.timestamp - a.timestamp
+        );
+        resolve(results);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async deleteSearchedAddress(address) {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.storeName], "readwrite");
+      const store = transaction.objectStore(this.storeName);
+
+      const request = store.delete(address);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async clearAllSearchedAddresses() {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.storeName], "readwrite");
+      const store = transaction.objectStore(this.storeName);
+
+      const request = store.clear();
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+}
+
+// Initialize the database
+const searchedAddressDB = new SearchedAddressDB();
+
 
 // Check if uhtml is available, otherwise use a fallback
 const {
@@ -339,6 +421,15 @@ async function connectWallet() {
     );
   }
 
+  // Show loading state
+  const connectBtn = document.querySelector('[onclick="connectWallet()"]');
+  const originalText = connectBtn ? connectBtn.innerHTML : "";
+  if (connectBtn) {
+    connectBtn.innerHTML =
+      '<i class="fas fa-spinner fa-spin"></i> Connecting...';
+    connectBtn.disabled = true;
+  }
+
   try {
     const wallet = getWalletFromPrivateKey(input);
     if (!wallet) {
@@ -399,6 +490,13 @@ async function connectWallet() {
   } catch (error) {
     console.error("Connect wallet error:", error);
     notify("Error connecting wallet: " + error.message, "error");
+  } finally {
+    // Restore button state
+    const connectBtn = document.querySelector('[onclick="connectWallet()"]');
+    if (connectBtn) {
+      connectBtn.innerHTML = '<i class="fas fa-plug"></i> Connect Wallet';
+      connectBtn.disabled = false;
+    }
   }
 }
 
@@ -562,7 +660,9 @@ async function sendXRP() {
     if (detailsContainer) {
       detailsContainer.innerHTML = `        <div class="detail-row">
           <span class="detail-label">From:</span>
-          <span class="detail-value">${wallet.classicAddress}</span>
+          <span class="detail-value">${
+            wallet.address || wallet.classicAddress
+          }</span>
         </div>
       <div class="detail-row">
         <span class="detail-label">To:</span>
@@ -596,6 +696,16 @@ async function confirmSend() {
   const { wallet, destination, amount } = window.pendingTransaction;
   const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
 
+  // Debug wallet type
+  console.log("Wallet object type:", {
+    hasSign: typeof wallet.sign === "function",
+    hasPrivateKey: !!wallet.privateKey,
+    hasPublicKey: !!wallet.publicKey,
+    hasClassicAddress: !!wallet.classicAddress,
+    hasAddress: !!wallet.address,
+    walletAddress: wallet.classicAddress || wallet.address,
+  });
+
   // Show loading state on confirm button
   const confirmBtn = document.querySelector('[onclick="confirmSend()"]');
   const originalText = confirmBtn.innerHTML;
@@ -606,9 +716,12 @@ async function confirmSend() {
     await client.connect();
 
     try {
+      // Get the correct address from wallet object
+      const walletAddress = wallet.classicAddress || wallet.address;
+
       const accountInfo = await client.request({
         command: "account_info",
-        account: wallet.classicAddress,
+        account: walletAddress,
         ledger_index: "validated",
       });
 
@@ -653,7 +766,7 @@ async function confirmSend() {
 
     const tx = {
       TransactionType: "Payment",
-      Account: wallet.classicAddress,
+      Account: wallet.classicAddress || wallet.address,
       Destination: destination,
       Amount: xrpl.xrpToDrops(amount.toString()),
       LastLedgerSequence: currentLedger + 20,
@@ -667,7 +780,54 @@ async function confirmSend() {
 
     let signed;
     try {
-      signed = wallet.sign(prepared);
+      // Handle different wallet types for signing
+      if (wallet.sign && typeof wallet.sign === "function") {
+        // Standard XRPL Wallet object (from seed)
+        console.log("Signing with standard XRPL Wallet object");
+        signed = wallet.sign(prepared);
+        console.log("Transaction signed with XRPL Wallet");
+      } else if (wallet.privateKey) {
+        // Custom wallet object (from hex or WIF conversion) - create temporary wallet
+        console.log(
+          "Signing with custom wallet object using hex private key:",
+          wallet.privateKey.substring(0, 8) + "..."
+        );
+
+        // For hex private keys, create a temporary XRPL Wallet object for signing
+        try {
+          // Create temporary XRPL Wallet from the private key and public key
+          const tempWallet = new xrpl.Wallet(
+            wallet.publicKey,
+            wallet.privateKey
+          );
+          signed = tempWallet.sign(prepared);
+          console.log(
+            "Transaction signed with temporary XRPL Wallet from hex private key"
+          );
+        } catch (walletError) {
+          console.log(
+            "Direct wallet creation failed, trying alternative method...",
+            walletError.message
+          );
+          // Alternative: Use xrpl.Wallet.fromSecret if we have seed
+          if (wallet.seed && wallet.seed.startsWith("s")) {
+            const seedWallet = xrpl.Wallet.fromSeed(wallet.seed);
+            signed = seedWallet.sign(prepared);
+            console.log("Transaction signed with seed-based wallet");
+          } else {
+            // Last resort: Create wallet from entropy derived from private key
+            const privateKeyBytes = new Uint8Array(
+              wallet.privateKey.match(/.{2}/g).map((byte) => parseInt(byte, 16))
+            );
+            const entropyWallet = xrpl.Wallet.fromEntropy(privateKeyBytes);
+            signed = entropyWallet.sign(prepared);
+            console.log("Transaction signed with entropy-based wallet");
+          }
+        }
+      } else {
+        throw new Error("Invalid wallet object - no signing method available");
+      }
+
       console.log("Transaction signed successfully!");
       console.log("Identifying hash:", signed.hash);
       console.log("Signed blob:", signed.tx_blob);
@@ -679,7 +839,7 @@ async function confirmSend() {
     const result = await client.submitAndWait(signed.tx_blob);
 
     console.log(" TX Hash:", signed.hash);
-    console.log(" From:", wallet.classicAddress);
+    console.log(" From:", wallet.classicAddress || wallet.address);
     console.log(" To:", destination);
     console.log(" Amount:", amount, "XRP");
 
@@ -806,11 +966,47 @@ async function confirmSend() {
 }
 
 function getWalletFromPrivateKey(inputKey) {
-  if (inputKey.startsWith("s")) return xrpl.Wallet.fromSeed(inputKey);
-  return convertWIFtoRippleWallet(inputKey);
-}
+  let wallet;
 
+  // Handle XRP seeds (starts with 's')
+  if (inputKey.startsWith("s")) {
+    wallet = xrpl.Wallet.fromSeed(inputKey);
+  }
+  // Handle hex private keys (64 characters, with or without 0x prefix)
+  else {
+    const cleanKey = inputKey.replace(/^0x/, "").toLowerCase();
+    if (cleanKey.length === 64 && /^[0-9a-f]+$/.test(cleanKey)) {
+      wallet = convertHexToRippleWallet(inputKey);
+    } else {
+      // Handle WIF private keys (Base58 encoded)
+      try {
+        wallet = convertWIFtoRippleWallet(inputKey);
+      } catch (error) {
+        throw new Error(`Unsupported key format. Please use:
+        • XRP Seed (s...)
+        • Hex Private Key (64 characters, with or without 0x)
+        • WIF Private Key (Base58 encoded)`);
+      }
+    }
+  }
+
+  // Normalize wallet object to ensure it has both address and classicAddress
+  if (wallet && !wallet.classicAddress && wallet.address) {
+    wallet.classicAddress = wallet.address;
+  }
+
+  return wallet;
+}
 async function generateWallet() {
+  // Show loading state
+  const generateBtn = document.querySelector('[onclick="generateWallet()"]');
+  const originalText = generateBtn ? generateBtn.innerHTML : "";
+  if (generateBtn) {
+    generateBtn.innerHTML =
+      '<i class="fas fa-spinner fa-spin"></i> Generating...';
+    generateBtn.disabled = true;
+  }
+
   try {
     // Generate a single private key for XRP only
     const cryptoObj = window.crypto || crypto;
@@ -851,6 +1047,14 @@ async function generateWallet() {
   } catch (error) {
     notify("Failed to generate wallet: " + error.message, "error");
     console.error("Wallet generation error:", error);
+  } finally {
+    // Restore button state
+    const generateBtn = document.querySelector('[onclick="generateWallet()"]');
+    if (generateBtn) {
+      generateBtn.innerHTML =
+        '<i class="fas fa-plus-circle"></i> Generate New Wallet';
+      generateBtn.disabled = false;
+    }
   }
 }
 
@@ -1062,6 +1266,12 @@ async function checkBalance() {
       return;
     }
 
+    // Show loading state
+    const checkBtn = document.querySelector('[onclick="checkBalance()"]');
+    const originalText = checkBtn.innerHTML;
+    checkBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
+    checkBtn.disabled = true;
+
     // Create XRPL client instance
     const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
 
@@ -1086,6 +1296,18 @@ async function checkBalance() {
           "displayBalance"
         ).textContent = `${balance.toLocaleString()} XRP`;
         document.getElementById("checkedAddress").textContent = address;
+
+        // Save to IndexedDB
+        try {
+          await searchedAddressDB.saveSearchedAddress(
+            address,
+            balance.toLocaleString()
+          );
+          await updateSearchedAddressesList();
+        } catch (dbError) {
+          console.warn("Failed to save address to IndexedDB:", dbError);
+        }
+
         // Show balance info
         document.getElementById("balanceInfo").style.display = "block";
 
@@ -1095,6 +1317,14 @@ async function checkBalance() {
           // Account not found (not activated)
           document.getElementById("displayBalance").textContent = "0 XRP";
           document.getElementById("checkedAddress").textContent = address;
+
+          // Save to IndexedDB
+          try {
+            await searchedAddressDB.saveSearchedAddress(address, "0");
+            await updateSearchedAddressesList();
+          } catch (dbError) {
+            console.warn("Failed to save address to IndexedDB:", dbError);
+          }
 
           // Show balance info
           document.getElementById("balanceInfo").style.display = "block";
@@ -1109,12 +1339,385 @@ async function checkBalance() {
       }
     } finally {
       await client.disconnect();
+      // Restore button state
+      checkBtn.innerHTML = originalText;
+      checkBtn.disabled = false;
     }
   } catch (error) {
     console.error("Error checking balance:", error);
     notify(`Error checking balance: ${error.message}`, "error");
+    // Restore button state on error
+    const checkBtn = document.querySelector('[onclick="checkBalance()"]');
+    if (checkBtn) {
+      checkBtn.innerHTML = '<i class="fas fa-search-dollar"></i> Check Balance';
+      checkBtn.disabled = false;
+    }
   }
 }
+
+// Searched Addresses Management
+async function updateSearchedAddressesList() {
+  try {
+    const searchedAddresses = await searchedAddressDB.getSearchedAddresses();
+    displaySearchedAddresses(searchedAddresses);
+  } catch (error) {
+    console.error("Error loading searched addresses:", error);
+  }
+}
+
+function displaySearchedAddresses(addresses) {
+  // Check if we need to create the searched addresses container
+  let container = document.getElementById("searchedAddressesContainer");
+
+  if (!container && addresses.length > 0) {
+    // Create the container after the balance check card
+    const balanceCard = document.querySelector("#connectPage .card");
+    container = document.createElement("div");
+    container.id = "searchedAddressesContainer";
+    container.className = "card searched-addresses-card";
+    balanceCard.parentNode.insertBefore(container, balanceCard.nextSibling);
+  }
+
+  if (!container) return;
+
+  if (addresses.length === 0) {
+    container.style.display = "none";
+    return;
+  }
+
+  container.style.display = "block";
+  container.innerHTML = `
+    <div class="searched-addresses-header">
+      <h3><i class="fas fa-history"></i> Searched addresses</h3>
+      <button onclick="clearAllSearchedAddresses()" class="btn-clear-all" title="Clear all">
+        <i class="fas fa-trash"></i> Clear All
+      </button>
+    </div>
+    <div class="searched-addresses-list">
+      ${addresses
+        .map(
+          (addr) => `
+        <div class="searched-address-item">
+          <div class="address-info">
+            <div class="address-text" title="${addr.address}">${addr.address}</div>
+            <div class="address-balance">${addr.formattedBalance}</div>
+          </div>
+          <div class="address-actions">
+            <button onclick="copyAddressToClipboard('${addr.address}')" class="btn-copy" title="Copy">
+              <i class="fas fa-copy"></i> COPY
+            </button>
+            <button onclick="deleteSearchedAddress('${addr.address}')" class="btn-delete" title="Delete">
+              Delete
+            </button>
+            <button onclick="recheckBalance('${addr.address}')" class="btn-check" title="Check balance">
+              Check balance
+            </button>
+          </div>
+        </div>
+      `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+async function deleteSearchedAddress(address) {
+  try {
+    await searchedAddressDB.deleteSearchedAddress(address);
+    await updateSearchedAddressesList();
+    notify("Address removed from history", "success");
+  } catch (error) {
+    console.error("Error deleting searched address:", error);
+    notify("Failed to remove address", "error");
+  }
+}
+
+async function clearAllSearchedAddresses() {
+  try {
+    await searchedAddressDB.clearAllSearchedAddresses();
+    await updateSearchedAddressesList();
+    notify("All searched addresses cleared", "success");
+  } catch (error) {
+    console.error("Error clearing searched addresses:", error);
+    notify("Failed to clear addresses", "error");
+  }
+}
+
+async function copyAddressToClipboard(address) {
+  try {
+    await navigator.clipboard.writeText(address);
+    notify("Address copied to clipboard", "success");
+  } catch (error) {
+    console.error("Error copying to clipboard:", error);
+    notify("Failed to copy address", "error");
+  }
+}
+
+async function recheckBalance(address) {
+  document.getElementById("checkAddress").value = address;
+  await checkBalance();
+}
+
+// Transaction pagination and filtering
+let allTransactions = [];
+let filteredTransactions = [];
+let currentPage = 1;
+const transactionsPerPage = 10;
+let currentFilter = "all";
+
+function setTransactionFilter(filter) {
+  currentFilter = filter;
+  currentPage = 1;
+
+  // Update filter button states
+  document.querySelectorAll(".filter-btn").forEach((btn) => {
+    btn.classList.remove("active");
+    if (btn.dataset.filter === filter) {
+      btn.classList.add("active");
+    }
+  });
+
+  // Filter transactions
+  filterAndDisplayTransactions();
+}
+
+function filterAndDisplayTransactions() {
+  const address = document.getElementById("lookupAddress").value.trim();
+
+  // Filter transactions based on current filter
+  switch (currentFilter) {
+    case "received":
+      filteredTransactions = allTransactions.filter(
+        (tx) => tx.tx.Destination === address
+      );
+      break;
+    case "sent":
+      filteredTransactions = allTransactions.filter(
+        (tx) => tx.tx.Account === address
+      );
+      break;
+    default:
+      filteredTransactions = [...allTransactions];
+  }
+
+  displayTransactionsPage();
+  updatePaginationControls();
+}
+
+function displayTransactionsPage() {
+  const startIndex = (currentPage - 1) * transactionsPerPage;
+  const endIndex = startIndex + transactionsPerPage;
+  const pageTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+  const txList = document.getElementById("txList");
+  const address = document.getElementById("lookupAddress").value.trim();
+
+  if (pageTransactions.length === 0) {
+    if (filteredTransactions.length === 0 && allTransactions.length > 0) {
+      txList.innerHTML = `
+        <div class="no-transactions">
+          <i class="fas fa-filter"></i>
+          <p>No ${
+            currentFilter === "all" ? "" : currentFilter
+          } transactions found for this filter.</p>
+        </div>
+      `;
+    } else {
+      txList.innerHTML = `
+        <div class="no-transactions">
+          <i class="fas fa-inbox"></i>
+          <p>No transactions found for this address.</p>
+        </div>
+      `;
+    }
+    return;
+  }
+
+  txList.innerHTML = "";
+
+  pageTransactions.forEach((tx) => {
+    const t = tx.tx;
+    const meta = tx.meta;
+    const date = new Date((t.date + 946684800) * 1000); // Ripple epoch conversion
+
+    // Determine transaction direction and type
+    const isIncoming = t.Destination === address;
+    const direction = isIncoming ? "Received" : "Sent";
+    const directionIcon = isIncoming ? "fa-arrow-down" : "fa-arrow-up";
+    const directionClass = isIncoming ? "incoming" : "outgoing";
+
+    // Get amount - handle different formats
+    let amount = "0";
+    if (meta.delivered_amount) {
+      amount = xrpl.dropsToXrp(meta.delivered_amount);
+    } else if (t.Amount && typeof t.Amount === "string") {
+      amount = xrpl.dropsToXrp(t.Amount);
+    }
+
+    // Format date
+    const formattedDate = date.toLocaleDateString("en-US", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    const formattedTime = date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    // Transaction status
+    const isSuccess = meta.TransactionResult === "tesSUCCESS";
+    const statusText = isSuccess ? "Confirmed" : "Failed";
+    const statusClass = isSuccess ? "success" : "failed";
+
+    const div = document.createElement("div");
+    div.className = `transaction-card ${directionClass}`;
+    div.innerHTML = `
+      <div class="tx-main">
+        <div class="tx-icon">
+          <i class="fas ${directionIcon}"></i>
+        </div>
+        <div class="tx-info">
+          <div class="tx-header">
+            <span class="tx-direction">${direction}</span>
+            <span class="tx-date">${formattedDate}, ${formattedTime}</span>
+          </div>
+          <div class="tx-amount ${directionClass}">
+            ${amount} XRP
+          </div>
+          <div class="tx-addresses">
+            <div class="tx-address-row">
+              <span class="address-label">From:</span>
+              <span class="address-value">${t.Account.substring(
+                0,
+                8
+              )}...${t.Account.substring(t.Account.length - 6)}</span>
+            </div>
+            <div class="tx-address-row">
+              <span class="address-label">To:</span>
+              <span class="address-value">${
+                t.Destination
+                  ? t.Destination.substring(0, 8) +
+                    "..." +
+                    t.Destination.substring(t.Destination.length - 6)
+                  : "N/A"
+              }</span>
+            </div>
+          </div>
+          <div class="tx-hash">
+            <span class="hash-label">Tx:</span>
+            <span class="hash-value">${t.hash.substring(
+              0,
+              8
+            )}...${t.hash.substring(t.hash.length - 6)}</span>
+          </div>
+        </div>
+        <div class="tx-status ${statusClass}">
+          ${statusText}
+        </div>
+      </div>
+    `;
+    txList.appendChild(div);
+  });
+}
+
+function updatePaginationControls() {
+  const totalPages = Math.ceil(
+    filteredTransactions.length / transactionsPerPage
+  );
+  const startIndex = (currentPage - 1) * transactionsPerPage + 1;
+  const endIndex = Math.min(
+    currentPage * transactionsPerPage,
+    filteredTransactions.length
+  );
+
+  // Update pagination info
+  document.getElementById(
+    "paginationInfo"
+  ).textContent = `Showing ${startIndex} - ${endIndex} of ${filteredTransactions.length} transactions`;
+
+  // Update previous/next buttons
+  document.getElementById("prevBtn").disabled = currentPage === 1;
+  document.getElementById("nextBtn").disabled =
+    currentPage === totalPages || totalPages === 0;
+
+  // Update page numbers
+  generatePageNumbers(totalPages);
+}
+
+function generatePageNumbers(totalPages) {
+  const pageNumbers = document.getElementById("pageNumbers");
+  pageNumbers.innerHTML = "";
+
+  if (totalPages <= 1) return;
+
+  // Calculate which page numbers to show
+  let startPage = Math.max(1, currentPage - 2);
+  let endPage = Math.min(totalPages, startPage + 4);
+
+  if (endPage - startPage < 4) {
+    startPage = Math.max(1, endPage - 4);
+  }
+
+  // Add first page and ellipsis if needed
+  if (startPage > 1) {
+    addPageNumber(1);
+    if (startPage > 2) {
+      const ellipsis = document.createElement("span");
+      ellipsis.textContent = "...";
+      ellipsis.className = "page-ellipsis";
+      pageNumbers.appendChild(ellipsis);
+    }
+  }
+
+  // Add page numbers
+  for (let i = startPage; i <= endPage; i++) {
+    addPageNumber(i);
+  }
+
+  // Add last page and ellipsis if needed
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) {
+      const ellipsis = document.createElement("span");
+      ellipsis.textContent = "...";
+      ellipsis.className = "page-ellipsis";
+      pageNumbers.appendChild(ellipsis);
+    }
+    addPageNumber(totalPages);
+  }
+}
+
+function addPageNumber(pageNum) {
+  const pageNumbers = document.getElementById("pageNumbers");
+  const pageBtn = document.createElement("button");
+  pageBtn.className = `page-number ${pageNum === currentPage ? "active" : ""}`;
+  pageBtn.textContent = pageNum;
+  pageBtn.onclick = () => goToPage(pageNum);
+  pageNumbers.appendChild(pageBtn);
+}
+
+function goToPage(page) {
+  currentPage = page;
+  displayTransactionsPage();
+  updatePaginationControls();
+}
+
+function goToPreviousPage() {
+  if (currentPage > 1) {
+    goToPage(currentPage - 1);
+  }
+}
+
+function goToNextPage() {
+  const totalPages = Math.ceil(
+    filteredTransactions.length / transactionsPerPage
+  );
+  if (currentPage < totalPages) {
+    goToPage(currentPage + 1);
+  }
+}
+
 async function lookupTransactions() {
   const address = document.getElementById("lookupAddress").value.trim();
   if (!address) {
@@ -1128,6 +1731,9 @@ async function lookupTransactions() {
   lookupBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
   lookupBtn.disabled = true;
 
+  // Hide controls initially
+  document.getElementById("transactionControls").style.display = "none";
+
   const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
   try {
     await client.connect();
@@ -1136,81 +1742,36 @@ async function lookupTransactions() {
       account: address,
       ledger_index_min: -1,
       ledger_index_max: -1,
-      limit: 20,
+      limit: 1000,
     });
 
-    const txList = document.getElementById("txList");
-    txList.innerHTML = "";
+    // Store all transactions
+    allTransactions = res.result.transactions;
 
-    if (res.result.transactions.length === 0) {
-      txList.innerHTML =
+    // Reset pagination state
+    currentPage = 1;
+    currentFilter = "all";
+
+    // Reset filter buttons
+    document.querySelectorAll(".filter-btn").forEach((btn) => {
+      btn.classList.remove("active");
+      if (btn.dataset.filter === "all") {
+        btn.classList.add("active");
+      }
+    });
+
+    if (allTransactions.length === 0) {
+      document.getElementById("txList").innerHTML =
         '<div class="no-transactions"><i class="fas fa-inbox"></i><p>No transactions found for this address.</p></div>';
       notify("No transactions found.", "error");
       return;
     }
 
-    res.result.transactions.forEach((tx) => {
-      const t = tx.tx;
-      const meta = tx.meta;
-      const date = new Date((t.date + 946684800) * 1000); // Ripple epoch conversion
+    // Show controls and display transactions
+    document.getElementById("transactionControls").style.display = "block";
+    filterAndDisplayTransactions();
 
-      const div = document.createElement("div");
-      div.className = "transaction-card";
-      div.innerHTML = `
-                        <div class="tx-header">
-                            <div class="tx-type">
-                                <i class="fas fa-${
-                                  t.TransactionType === "Payment"
-                                    ? "paper-plane"
-                                    : "cog"
-                                }"></i>
-                                <span>${t.TransactionType}</span>
-                            </div>
-                            <div class="tx-status ${
-                              meta.TransactionResult === "tesSUCCESS"
-                                ? "success"
-                                : "failed"
-                            }">
-                                ${
-                                  meta.TransactionResult === "tesSUCCESS"
-                                    ? "Success"
-                                    : "Failed"
-                                }
-                            </div>
-                        </div>
-                        <div class="tx-details">
-                            <div class="detail-item">
-                                <span class="label">Amount:</span>
-                                <span class="value">${
-                                  meta.delivered_amount
-                                    ? xrpl.dropsToXrp(meta.delivered_amount)
-                                    : "0"
-                                } XRP</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="label">From:</span>
-                                <span class="value address">${t.Account}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="label">To:</span>
-                                <span class="value address">${
-                                  t.Destination || "N/A"
-                                }</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="label">Date:</span>
-                                <span class="value">${date.toLocaleString()}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="label">Hash:</span>
-                                <span class="value hash">${t.hash}</span>
-                            </div>
-                        </div>
-                    `;
-      txList.appendChild(div);
-    });
-
-    notify(`Found ${res.result.transactions.length} transactions`, "success");
+    notify(`Found ${allTransactions.length} transactions`, "success");
   } catch (error) {
     notify("Failed to fetch transactions: " + error.message, "error");
     document.getElementById("txList").innerHTML =
@@ -1241,6 +1802,15 @@ async function generateXRPAddress() {
       );
       return;
     }
+
+    // Show loading state
+    const generateBtn = document.querySelector(
+      '[onclick="generateXRPAddress()"]'
+    );
+    const originalText = generateBtn.innerHTML;
+    generateBtn.innerHTML =
+      '<i class="fas fa-spinner fa-spin"></i> Generating...';
+    generateBtn.disabled = true;
 
     notify("Converting private key to Ripple seed...", "info");
 
@@ -1357,6 +1927,16 @@ async function generateXRPAddress() {
   } catch (error) {
     console.error("XRP generation error:", error);
     notify("Failed to generate XRP address: " + error.message, "error");
+  } finally {
+    // Restore button state
+    const generateBtn = document.querySelector(
+      '[onclick="generateXRPAddress()"]'
+    );
+    if (generateBtn) {
+      generateBtn.innerHTML =
+        '<i class="fas fa-coins"></i> Generate XRP Address';
+      generateBtn.disabled = false;
+    }
   }
 }
 
@@ -1432,74 +2012,145 @@ async function retrieveBTCAddress() {
 async function retrieveXRPAddress() {
   const keyInput = document.getElementById("recoverKey");
   if (!keyInput || !keyInput.value.trim()) {
-    notify(
-      "Please enter a private key from any blockchain (BTC/FLO/ETH/SOL/BNB/MATIC)",
-      "error"
-    );
+    notify("Please enter a private key or seed", "error");
     return;
   }
 
+  // Show loading state
+  const retrieveBtn = document.querySelector(
+    '[onclick="retrieveXRPAddress()"]'
+  );
+  const originalText = retrieveBtn.innerHTML;
+  retrieveBtn.innerHTML =
+    '<i class="fas fa-spinner fa-spin"></i> Retrieving...';
+  retrieveBtn.disabled = true;
+
   try {
-    notify("Converting private key to XRP address...", "info");
-
-    const sourcePrivateKey = keyInput.value.trim();
+    const sourceKey = keyInput.value.trim();
     let walletResult;
-    let sourceBlockchain = "Unknown";
+    let sourceType;
 
-    // Convert the source private key using improved logic
-    if (sourcePrivateKey.startsWith("L") || sourcePrivateKey.startsWith("K")) {
-      // Bitcoin WIF format - use improved WIF conversion
-      sourceBlockchain = "Bitcoin";
-      walletResult = convertWIFtoRippleWallet(sourcePrivateKey);
-    } else if (
-      sourcePrivateKey.startsWith("0x") &&
-      sourcePrivateKey.length === 66
-    ) {
-      // Ethereum-style private key (ETH/BNB/MATIC) - use improved hex conversion
-      sourceBlockchain = "ETH/BNB/MATIC";
-      walletResult = convertHexToRippleWallet(sourcePrivateKey);
-    } else if (sourcePrivateKey.length === 64) {
-      // Raw hex private key (could be SOL, ETH without 0x, etc.) - use improved hex conversion
-      sourceBlockchain = "SOL/ETH/Other";
-      walletResult = convertHexToRippleWallet(sourcePrivateKey);
-    } else if (
-      sourcePrivateKey.length === 88 &&
-      /^[1-9A-HJ-NP-Za-km-z]+$/.test(sourcePrivateKey)
-    ) {
-      // Solana private key (Base58 encoded) - convert to hex first
-      sourceBlockchain = "Solana";
-      const decoded = bs58check.decode(sourcePrivateKey);
-      const hexKey = Array.from(decoded.slice(0, 32))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-      walletResult = convertHexToRippleWallet(hexKey);
-    } else {
-      // Try to decode as WIF (FLO or other)
+    // Check if it's an XRP seed first (starts with 's')
+    if (sourceKey.startsWith("s") && sourceKey.length >= 25) {
       try {
-        sourceBlockchain = "FLO/Other";
-        walletResult = convertWIFtoRippleWallet(sourcePrivateKey);
+        sourceType = "XRP Seed";
+        notify("Retrieving XRP address from seed...", "info");
+        const rippleWallet = xrpl.Wallet.fromSeed(sourceKey);
+        walletResult = {
+          address: rippleWallet.address,
+          publicKey: rippleWallet.publicKey,
+          privateKey: rippleWallet.privateKey,
+          seed: rippleWallet.seed,
+        };
+      } catch (seedError) {
+        console.log("Not a valid XRP seed, trying as private key...");
+        throw new Error("Invalid XRP seed format");
+      }
+    }
+    // Check if it's a Bitcoin WIF format (starts with "L" or "K")
+    else if (sourceKey.startsWith("L") || sourceKey.startsWith("K")) {
+      if (typeof elliptic === "undefined") {
+        throw new Error(
+          "elliptic library not loaded. Please refresh the page."
+        );
+      }
+      if (typeof bs58check === "undefined") {
+        throw new Error(
+          "bs58check library not loaded. Please refresh the page."
+        );
+      }
+
+      sourceType = "Bitcoin WIF";
+      notify("Converting Bitcoin WIF to XRP address...", "info");
+      walletResult = convertWIFtoRippleWallet(sourceKey);
+    }
+    // Check if it's Ethereum-style hex (starts with "0x", 66 chars)
+    else if (sourceKey.startsWith("0x") && sourceKey.length === 66) {
+      if (typeof elliptic === "undefined") {
+        throw new Error(
+          "elliptic library not loaded. Please refresh the page."
+        );
+      }
+
+      sourceType = "ETH/BNB/MATIC Hex";
+      notify("Converting ETH/BNB/MATIC key to XRP address...", "info");
+      walletResult = convertHexToRippleWallet(sourceKey);
+    }
+    // Check if it's raw hex (64 characters)
+    else if (sourceKey.length === 64 && /^[0-9a-fA-F]+$/.test(sourceKey)) {
+      if (typeof elliptic === "undefined") {
+        throw new Error(
+          "elliptic library not loaded. Please refresh the page."
+        );
+      }
+
+      sourceType = "SOL/ETH/Other Hex";
+      notify("Converting hex key to XRP address...", "info");
+      walletResult = convertHexToRippleWallet(sourceKey);
+    }
+    // Check if it's Solana Base58 format (88 characters)
+    else if (
+      sourceKey.length === 88 &&
+      /^[1-9A-HJ-NP-Za-km-z]+$/.test(sourceKey)
+    ) {
+      if (typeof bs58 === "undefined") {
+        throw new Error("bs58 library not loaded. Please refresh the page.");
+      }
+
+      sourceType = "Solana Base58";
+      notify("Converting Solana key to XRP address...", "info");
+      try {
+        const decoded = bs58.decode(sourceKey);
+        const privateKeyHex = Array.from(decoded.slice(0, 32))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        walletResult = convertHexToRippleWallet(privateKeyHex);
+      } catch (decodeError) {
+        throw new Error("Invalid Solana Base58 private key format");
+      }
+    }
+    // Try as FLO or other WIF format (fallback)
+    else {
+      try {
+        if (
+          typeof elliptic === "undefined" ||
+          typeof bs58check === "undefined"
+        ) {
+          throw new Error(
+            "Required libraries not loaded. Please refresh the page."
+          );
+        }
+
+        sourceType = "FLO/Other WIF";
+        notify("Converting WIF key to XRP address...", "info");
+        walletResult = convertWIFtoRippleWallet(sourceKey);
       } catch (e) {
         throw new Error(
-          "Unsupported private key format. Please use BTC WIF, FLO WIF, ETH (0x...), SOL, BNB, or MATIC private key."
+          `Unsupported key/seed format. Supported formats:
+          • XRP Seed (s...)
+          • Bitcoin WIF (L.../K...)
+          • Ethereum Hex (0x...)
+          • Raw Hex (64 chars)
+          • Solana Base58 (88 chars)
+          • FLO WIF`
         );
       }
     }
 
-    // Display result
+    // Display the retrieved wallet information
     const outputDiv = document.getElementById("recoveryOutput");
     if (outputDiv) {
       outputDiv.innerHTML = `
         <div class="wallet-result">
-          <h3><i class="fas fa-coins"></i> XRP Address Retrieved</h3>
-          <div class="source-info" style="background: #f0f8ff; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; border-left: 4px solid var(--primary-color);">
-            <small><strong>Source:</strong> Derived from ${sourceBlockchain} private key using elliptic curve cryptography</small>
-          </div>
+          <h3><i class="fas fa-key"></i> XRP Address Retrieved</h3>
           <div class="wallet-details">
             <div class="detail-row">
               <label>XRP Address:</label>
               <div class="value-container">
                 <code>${walletResult.address}</code>
-                <button onclick="copyToClipboard('${walletResult.address}')" class="btn-copy">
+                <button onclick="copyToClipboard('${
+                  walletResult.address
+                }')" class="btn-copy">
                   <i class="fas fa-copy"></i>
                 </button>
               </div>
@@ -1508,7 +2159,9 @@ async function retrieveXRPAddress() {
               <label>Public Key:</label>
               <div class="value-container">
                 <code>${walletResult.publicKey}</code>
-                <button onclick="copyToClipboard('${walletResult.publicKey}')" class="btn-copy">
+                <button onclick="copyToClipboard('${
+                  walletResult.publicKey
+                }')" class="btn-copy">
                   <i class="fas fa-copy"></i>
                 </button>
               </div>
@@ -1517,16 +2170,22 @@ async function retrieveXRPAddress() {
               <label>Private Key (Hex):</label>
               <div class="value-container">
                 <code>${walletResult.privateKey}</code>
-                <button onclick="copyToClipboard('${walletResult.privateKey}')" class="btn-copy">
+                <button onclick="copyToClipboard('${
+                  walletResult.privateKey
+                }')" class="btn-copy">
                   <i class="fas fa-copy"></i>
                 </button>
               </div>
             </div>
             <div class="detail-row">
-              <label>Original Key:</label>
+              <label>Original ${
+                sourceType === "XRP Seed" ? "Seed" : "Key"
+              }:</label>
               <div class="value-container">
                 <code>${walletResult.seed}</code>
-                <button onclick="copyToClipboard('${walletResult.seed}')" class="btn-copy">
+                <button onclick="copyToClipboard('${
+                  walletResult.seed
+                }')" class="btn-copy">
                   <i class="fas fa-copy"></i>
                 </button>
               </div>
@@ -1534,20 +2193,31 @@ async function retrieveXRPAddress() {
           </div>
           <div class="warning-message" style="margin-top: 1rem; padding: 0.75rem; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; color: #856404;">
             <i class="fas fa-exclamation-triangle"></i>
-            <strong>Important:</strong> This XRP address is mathematically derived from your ${sourceBlockchain} private key using proper elliptic curve cryptography.
+            <strong>Retrieved from ${sourceType}:</strong> ${
+        sourceType === "XRP Seed"
+          ? "This XRP address was retrieved from your original XRP seed."
+          : `This XRP address is mathematically derived from your ${sourceType} using elliptic curve cryptography.`
+      }
           </div>
         </div>
       `;
       outputDiv.style.display = "block";
     }
 
-    notify(
-      `XRP address retrieved successfully from ${sourceBlockchain} private key!`,
-      "success"
+    notify(`XRP address retrieved successfully from ${sourceType}!`, "success");
+  } catch (conversionError) {
+    console.error("Key/seed conversion error:", conversionError);
+    notify("Failed to retrieve address: " + conversionError.message, "error");
+  } finally {
+    // Restore button state
+    const retrieveBtn = document.querySelector(
+      '[onclick="retrieveXRPAddress()"]'
     );
-  } catch (error) {
-    console.error("XRP retrieval error:", error);
-    notify("Failed to retrieve XRP address: " + error.message, "error");
+    if (retrieveBtn) {
+      retrieveBtn.innerHTML =
+        '<i class="fas fa-coins"></i> Retrieve XRP Address';
+      retrieveBtn.disabled = false;
+    }
   }
 }
 
@@ -1668,3 +2338,12 @@ window.lookupTransactions = lookupTransactions;
 window.getWalletFromPrivateKey = getWalletFromPrivateKey;
 window.convertWIFtoRippleWallet = convertWIFtoRippleWallet;
 window.convertHexToRippleWallet = convertHexToRippleWallet;
+window.setTransactionFilter = setTransactionFilter;
+window.goToPreviousPage = goToPreviousPage;
+window.goToNextPage = goToNextPage;
+// Searched addresses functions
+window.updateSearchedAddressesList = updateSearchedAddressesList;
+window.deleteSearchedAddress = deleteSearchedAddress;
+window.clearAllSearchedAddresses = clearAllSearchedAddresses;
+window.copyAddressToClipboard = copyAddressToClipboard;
+window.recheckBalance = recheckBalance;

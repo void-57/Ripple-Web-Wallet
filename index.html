@@ -16,10 +16,9 @@
 
     <!-- External Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/xrpl@2.7.0/build/xrpl-latest-min.js"></script>
-    <script src="https://unpkg.com/uhtml@4.5.11/uhtml.js"></script>
+    
     <script src="https://unpkg.com/@preact/signals-core@1.7.0/dist/signals-core.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.6.1/elliptic.min.js"></script>
-  
   </head>
   <body class="hidden">
     <!-- Loading Screen -->
@@ -169,8 +168,7 @@
                 autocomplete="off"
               />
               <div class="input-help">
-                Use your Ripple seed (s...), WIF private key (L.../K...), or hex
-                private key (64 characters)
+                Use your Ripple seed (s...) or hex private key (64 characters)
               </div>
             </div>
 
@@ -237,6 +235,66 @@
             </div>
           </div>
 
+          <!-- Transaction Filter and Pagination Controls -->
+          <div
+            id="transactionControls"
+            class="transaction-controls"
+            style="display: none"
+          >
+            <div class="filter-section">
+              <div class="filter-buttons">
+                <button
+                  class="filter-btn active"
+                  data-filter="all"
+                  onclick="setTransactionFilter('all')"
+                >
+                  <i class="fas fa-list"></i> All
+                </button>
+                <button
+                  class="filter-btn"
+                  data-filter="received"
+                  onclick="setTransactionFilter('received')"
+                >
+                  <i class="fas fa-arrow-down"></i> Received
+                </button>
+                <button
+                  class="filter-btn"
+                  data-filter="sent"
+                  onclick="setTransactionFilter('sent')"
+                >
+                  <i class="fas fa-arrow-up"></i> Sent
+                </button>
+              </div>
+            </div>
+
+            <div class="pagination-section">
+              <div class="pagination-info" id="paginationInfo">
+                Showing 0 - 0 of 0 transactions
+              </div>
+              <div class="pagination-controls">
+                <button
+                  class="pagination-btn"
+                  id="prevBtn"
+                  onclick="goToPreviousPage()"
+                  disabled
+                >
+                  <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="page-numbers" id="pageNumbers">
+                  <!-- Page numbers will be inserted here -->
+                </div>
+                <button
+                  class="pagination-btn"
+                  id="nextBtn"
+                  onclick="goToNextPage()"
+                  disabled
+                >
+                  <i class="fas fa-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Transaction Results -->
           <div id="txList" class="transaction-list">
             <!-- Transaction cards will be inserted here -->
@@ -259,20 +317,19 @@
               <input
                 type="password"
                 id="generateKey"
-                placeholder="Enter private key from any blockchain (BTC/FLO/ETH/SOL/BNB/MATIC)"
+                placeholder="Enter private key from any blockchain (BTC/FLO)"
                 class="form-input"
               />
               <small class="form-text">
-                Enter a private key from any blockchain
-                (BTC/FLO/ETH/SOL/BNB/MATIC) to generate the corresponding XRP
-                address.
+                Enter a private key from any blockchain (BTC/FLO) to generate
+                the corresponding XRP address.
               </small>
             </div>
 
             <div class="generate-actions">
               <button
                 onclick="generateXRPAddress()"
-                class="btn btn-primary btn-block generate-btn"
+                class="btn btn-primary btn-block"
               >
                 <i class="fas fa-coins"></i> Generate XRP Address
               </button>
@@ -322,7 +379,7 @@
         <div id="recoverPage" class="page hidden">
           <div class="page-header">
             <h2><i class="fas fa-key"></i> Retrieve XRP Address</h2>
-            <p>Retrieve your XRP address from any blockchain private key</p>
+            <p>Retrieve your XRP address from private key</p>
           </div>
 
           <div class="card">
@@ -339,15 +396,15 @@
               />
               <div class="input-help">
                 Enter your private key from any blockchain
-                (BTC/FLO/ETH/SOL/BNB/MATIC) or XRP seed to retrieve your XRP
-                address.
+                (BTC/FLO) or XRP seed (s...) to retrieve your
+                XRP address.
               </div>
             </div>
 
             <div class="retrieve-actions">
               <button
                 onclick="retrieveXRPAddress()"
-                class="btn btn-primary btn-block retrieve-btn"
+                class="btn btn-primary btn-block"
               >
                 <i class="fas fa-coins"></i> Retrieve XRP Address
               </button>
@@ -412,22 +469,17 @@
 
     <!-- Confirmation Popup -->
     <sm-popup id="sendConfirm">
-      <div slot="header">
-        <h3><i class="fas fa-exclamation-triangle"></i> Confirm Transaction</h3>
-      </div>
       <div class="popup-content">
-        <p>
-          Please review the transaction details below and confirm to proceed:
-        </p>
+        <h3><i class="fas fa-exclamation-triangle"></i> Confirm Transaction</h3>
         <div class="transaction-details" id="transactionDetails">
           <!-- Transaction details will be populated here -->
         </div>
         <div class="popup-actions">
           <button onclick="closePopup()" class="btn btn-secondary">
-            Cancel
+            <i class="fas fa-times"></i> Cancel
           </button>
           <button onclick="confirmSend()" class="btn btn-primary">
-            <i class="fas fa-paper-plane"></i> Send Transaction
+            <i class="fas fa-paper-plane"></i> Send
           </button>
         </div>
       </div>
@@ -530,6 +582,11 @@
       // Initialize theme when DOM is loaded
       document.addEventListener("DOMContentLoaded", function () {
         initializeTheme();
+
+        // Initialize searched addresses list
+        if (typeof updateSearchedAddressesList === 'function') {
+          updateSearchedAddressesList();
+        }
 
         // Add real-time validation for recipient address
         const recipientInput = document.getElementById("recipient");

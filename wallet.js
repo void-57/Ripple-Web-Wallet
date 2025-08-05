@@ -286,6 +286,106 @@ function notify(message, mode, options = {}) {
   return getRef("notification_drawer").push(message, { icon, ...options });
 }
 
+// Input field control functions
+function togglePasswordVisibility(inputId) {
+  const input = document.getElementById(inputId);
+  const toggleBtn = input.parentElement.querySelector('.toggle-password');
+  
+  if (input.type === 'password') {
+    input.type = 'text';
+    toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+    toggleBtn.title = 'Hide';
+  } else {
+    input.type = 'password';
+    toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+    toggleBtn.title = 'Show';
+  }
+}
+
+function clearInput(inputId) {
+  const input = document.getElementById(inputId);
+  input.value = '';
+  input.focus();
+  
+  // If it's a password field that was shown, hide it again
+  if (input.type === 'text' && input.classList.contains('password-field')) {
+    const toggleBtn = input.parentElement.querySelector('.toggle-password');
+    input.type = 'password';
+    toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+    toggleBtn.title = 'Show';
+  }
+  
+  notify('Input cleared', 'success');
+}
+
+// Initialize input containers with controls
+function initializeInputControls() {
+  // List of input IDs that need controls
+  const inputIds = [
+    'sendKey',       // Send page - sender key
+    'recipient',     // Send page - recipient
+    'amount',        // Send page - amount
+    'recoverKey',    // Retrieve page
+    'checkAddress',  // Balance check
+    'lookupAddress', // Transaction lookup
+    'generateKey'    // Generate page
+  ];
+  
+  inputIds.forEach(inputId => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    
+    // Skip if already wrapped
+    if (input.parentElement.classList.contains('input-container')) return;
+    
+    // Create wrapper container
+    const container = document.createElement('div');
+    container.className = 'input-container';
+    
+    // Insert container before input
+    input.parentNode.insertBefore(container, input);
+    
+    // Move input into container
+    container.appendChild(input);
+    
+    // Determine if this is a sensitive field (private keys, seeds)
+    const isSensitiveField = ['sendKey', 'recoverKey', 'generateKey'].includes(inputId);
+    
+    // Add password-field class for sensitive fields
+    if (isSensitiveField) {
+      input.classList.add('password-field');
+      input.type = 'password';
+    }
+    
+    // Create controls container
+    const controls = document.createElement('div');
+    controls.className = 'input-controls';
+    
+    // Add show/hide button for sensitive fields
+    if (isSensitiveField) {
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'input-control-btn toggle-password';
+      toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+      toggleBtn.title = 'Show';
+      toggleBtn.type = 'button';
+      toggleBtn.onclick = () => togglePasswordVisibility(inputId);
+      controls.appendChild(toggleBtn);
+    }
+    
+    // Add clear button for all fields
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'input-control-btn clear-input';
+    clearBtn.innerHTML = '<i class="fas fa-times"></i>';
+    clearBtn.title = 'Clear';
+    clearBtn.type = 'button';
+    clearBtn.onclick = () => clearInput(inputId);
+    controls.appendChild(clearBtn);
+    
+    // Add controls to container
+    container.appendChild(controls);
+  });
+}
+
 function getFormattedTime(timestamp, format) {
   try {
     if (String(timestamp).length < 13) timestamp *= 1000;
@@ -2047,9 +2147,17 @@ window.convertWIFtoRippleWallet = convertWIFtoRippleWallet;
 window.setTransactionFilter = setTransactionFilter;
 window.goToPreviousPage = goToPreviousPage;
 window.goToNextPage = goToNextPage;
+// Input control functions
+window.togglePasswordVisibility = togglePasswordVisibility;
+window.clearInput = clearInput;
 // Searched addresses functions
 window.updateSearchedAddressesList = updateSearchedAddressesList;
 window.deleteSearchedAddress = deleteSearchedAddress;
 window.clearAllSearchedAddresses = clearAllSearchedAddresses;
 window.copyAddressToClipboard = copyAddressToClipboard;
 window.recheckBalance = recheckBalance;
+
+// Initialize input controls when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  initializeInputControls();
+});

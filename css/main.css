@@ -451,6 +451,71 @@ body {
   margin-bottom: 0.25rem;
 }
 
+/* Input Controls Styling */
+.input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-controls {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 0.25rem;
+  z-index: 10;
+}
+
+.input-control-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 3px;
+  font-size: 0.875rem;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.input-control-btn:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+.input-control-btn:active {
+  transform: scale(0.95);
+}
+
+/* Adjust input padding to accommodate controls */
+.input-container input {
+  padding-right: 4rem !important;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .input-controls {
+    right: 0.25rem;
+    gap: 0.125rem;
+  }
+  
+  .input-control-btn {
+    width: 20px;
+    height: 20px;
+    font-size: 0.75rem;
+  }
+  
+  .input-container input {
+    padding-right: 3.5rem !important;
+  }
+}
+
 /* Searched Addresses Styles */
 .searched-addresses-card {
   background: var(--surface-color);

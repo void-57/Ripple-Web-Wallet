@@ -102,7 +102,6 @@ class SearchedAddressDB {
 // Initialize the database
 const searchedAddressDB = new SearchedAddressDB();
 
-
 // Check if uhtml is available, otherwise use a fallback
 const {
   html,
@@ -515,20 +514,11 @@ function getRippleAddress(input) {
 
 function convertWIFtoRippleWallet(wif) {
   try {
-    // Check if required libraries are available
-
-    if (typeof elliptic === "undefined") {
-      throw new Error("elliptic library not loaded. Please refresh the page.");
-    }
-    if (typeof xrpl === "undefined") {
-      throw new Error("XRPL library not loaded. Please refresh the page.");
-    }
-
-    // Use bs58check for proper WIF decoding
+   
     const decoded = bs58check.decode(wif);
     let keyBuffer = decoded.slice(1); // remove version byte
 
-    // Handle compression flag if present
+    
     if (keyBuffer.length === 33 && keyBuffer[32] === 0x01) {
       keyBuffer = keyBuffer.slice(0, -1); // remove compression flag
     }
@@ -538,70 +528,17 @@ function convertWIFtoRippleWallet(wif) {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
-    // Use elliptic to get the public key
-    const ec = new elliptic.ec("secp256k1");
-    const key = ec.keyFromPrivate(privHex);
-    const pubkey = key.getPublic(true, "hex"); // compressed public key
-
-    // Derive XRP address from public key
-    const address = xrpl.deriveAddress(pubkey);
-
-    // Return wallet-like object with the derived address and private key
+   
+    const data=xrpl.Wallet.fromEntropy(privHex)
+    console.log(data);
+    
     return {
-      address: address,
-      privateKey: privHex,
-      seed: wif, // Keep original WIF as seed
-      publicKey: pubkey,
+      address: data.address,
+      seed: data.seed
     };
   } catch (error) {
     console.error("WIF conversion error:", error);
     throw new Error("Invalid WIF private key format: " + error.message);
-  }
-}
-
-function convertHexToRippleWallet(hexPrivateKey) {
-  try {
-    // Check if required libraries are available
-    if (typeof elliptic === "undefined") {
-      throw new Error("elliptic library not loaded. Please refresh the page.");
-    }
-    if (typeof xrpl === "undefined") {
-      throw new Error("XRPL library not loaded. Please refresh the page.");
-    }
-
-    // Clean hex string (remove 0x prefix if present)
-    const privHex = hexPrivateKey.toLowerCase().replace(/^0x/, "");
-
-    // Validate hex length and format
-    if (privHex.length !== 64) {
-      throw new Error(
-        "Invalid hex private key length. Expected 64 characters."
-      );
-    }
-    if (!/^[0-9a-f]{64}$/.test(privHex)) {
-      throw new Error(
-        "Invalid hex format. Only hexadecimal characters allowed."
-      );
-    }
-
-    // Use elliptic to get the public key
-    const ec = new elliptic.ec("secp256k1");
-    const key = ec.keyFromPrivate(privHex);
-    const pubkey = key.getPublic(true, "hex"); // compressed public key
-
-    // Derive XRP address from public key
-    const address = xrpl.deriveAddress(pubkey);
-
-    // Return wallet-like object
-    return {
-      address: address,
-      privateKey: privHex,
-      seed: hexPrivateKey, // Keep original hex as seed
-      publicKey: pubkey,
-    };
-  } catch (error) {
-    console.error("Hex conversion error:", error);
-    throw new Error("Invalid hex private key format: " + error.message);
   }
 }
 
@@ -968,94 +905,9 @@ async function confirmSend() {
 function getWalletFromPrivateKey(inputKey) {
   let wallet;
 
-  // Handle XRP seeds (starts with 's')
-  if (inputKey.startsWith("s")) {
     wallet = xrpl.Wallet.fromSeed(inputKey);
-  }
-  // Handle hex private keys (64 characters, with or without 0x prefix)
-  else {
-    const cleanKey = inputKey.replace(/^0x/, "").toLowerCase();
-    if (cleanKey.length === 64 && /^[0-9a-f]+$/.test(cleanKey)) {
-      wallet = convertHexToRippleWallet(inputKey);
-    } else {
-      // Handle WIF private keys (Base58 encoded)
-      try {
-        wallet = convertWIFtoRippleWallet(inputKey);
-      } catch (error) {
-        throw new Error(`Unsupported key format. Please use:
-        • XRP Seed (s...)
-        • Hex Private Key (64 characters, with or without 0x)
-        • WIF Private Key (Base58 encoded)`);
-      }
-    }
-  }
-
-  // Normalize wallet object to ensure it has both address and classicAddress
-  if (wallet && !wallet.classicAddress && wallet.address) {
-    wallet.classicAddress = wallet.address;
-  }
-
+  
   return wallet;
-}
-async function generateWallet() {
-  // Show loading state
-  const generateBtn = document.querySelector('[onclick="generateWallet()"]');
-  const originalText = generateBtn ? generateBtn.innerHTML : "";
-  if (generateBtn) {
-    generateBtn.innerHTML =
-      '<i class="fas fa-spinner fa-spin"></i> Generating...';
-    generateBtn.disabled = true;
-  }
-
-  try {
-    // Generate a single private key for XRP only
-    const cryptoObj = window.crypto || crypto;
-    const entropy = cryptoObj.getRandomValues(new Uint8Array(32));
-
-    // Create Ripple wallet from entropy
-    const rippleWallet = xrpl.Wallet.fromEntropy(entropy);
-
-    const output = getRef("walletOutput");
-    output.innerHTML = `
-      <div class="wallet-generated">
-        <h3><i class="fas fa-check-circle"></i> XRP Wallet Generated Successfully</h3>
-        <div class="wallet-details">
-          <div class="wallet-item">
-            <h4><i class="fas fa-coins"></i> Ripple (XRP)</h4>
-            <div class="detail-row">
-              <span>Address:</span>
-              <code>${rippleWallet.address}</code>
-            </div>
-            <div class="detail-row">
-              <span>Seed:</span>
-              <code>${rippleWallet.seed}</code>
-            </div>
-            <div class="detail-row">
-              <span>Private Key:</span>
-              <code>${rippleWallet.privateKey}</code>
-            </div>
-          </div>
-        </div>
-        <div class="warning-message">
-          <i class="fas fa-exclamation-triangle"></i>
-          <strong>Important:</strong> Save these details securely. Loss of private keys means loss of funds.
-        </div>
-      </div>
-    `;
-    output.style.display = "block";
-    notify("New XRP wallet generated successfully!", "success");
-  } catch (error) {
-    notify("Failed to generate wallet: " + error.message, "error");
-    console.error("Wallet generation error:", error);
-  } finally {
-    // Restore button state
-    const generateBtn = document.querySelector('[onclick="generateWallet()"]');
-    if (generateBtn) {
-      generateBtn.innerHTML =
-        '<i class="fas fa-plus-circle"></i> Generate New Wallet';
-      generateBtn.disabled = false;
-    }
-  }
 }
 
 function recoverWallet() {
@@ -1088,8 +940,7 @@ function recoverWallet() {
 
     console.log("Recovered wallet:", {
       address: wallet.classicAddress,
-      seed: wallet.seed,
-      privateKey: wallet.privateKey,
+      seed: wallet.seed
     });
 
     const result = `
@@ -1105,14 +956,6 @@ function recoverWallet() {
             <div class="detail-row">
               <span>Seed:</span>
               <code>${wallet.seed}</code>
-            </div>
-            <div class="detail-row">
-              <span>Private Key:</span>
-              <code>${wallet.privateKey}</code>
-            </div>
-            <div class="detail-row">
-              <span>Public Key:</span>
-              <code>${wallet.publicKey}</code>
             </div>
           </div>
         </div>
@@ -1771,7 +1614,10 @@ async function lookupTransactions() {
     document.getElementById("transactionControls").style.display = "block";
     filterAndDisplayTransactions();
 
-    notify(`Found ${allTransactions.length} transactions`, "success");
+    notify(`Found ${allTransactions.length} transactions`, "success", {
+      pinned: true,
+      duration: 5000, // Show for 5 seconds
+    });
   } catch (error) {
     notify("Failed to fetch transactions: " + error.message, "error");
     document.getElementById("txList").innerHTML =
@@ -1797,7 +1643,7 @@ async function generateXRPAddress() {
     const sourcePrivateKey = keyInput.value.trim();
     if (!sourcePrivateKey) {
       notify(
-        "Please enter a private key from any blockchain (BTC/FLO/ETH/SOL/BNB/MATIC)",
+        "Please enter a private key from any blockchain (BTC/FLO)",
         "error"
       );
       return;
@@ -1826,28 +1672,7 @@ async function generateXRPAddress() {
         // Bitcoin WIF format - use improved WIF conversion
         sourceBlockchain = "Bitcoin";
         walletResult = convertWIFtoRippleWallet(sourcePrivateKey);
-      } else if (
-        sourcePrivateKey.startsWith("0x") &&
-        sourcePrivateKey.length === 66
-      ) {
-        // Ethereum-style private key (ETH/BNB/MATIC) - use improved hex conversion
-        sourceBlockchain = "ETH/BNB/MATIC";
-        walletResult = convertHexToRippleWallet(sourcePrivateKey);
-      } else if (sourcePrivateKey.length === 64) {
-        // Raw hex private key (could be SOL, ETH without 0x, etc.) - use improved hex conversion
-        sourceBlockchain = "SOL/ETH/Other";
-        walletResult = convertHexToRippleWallet(sourcePrivateKey);
-      } else if (
-        sourcePrivateKey.length === 88 &&
-        /^[1-9A-HJ-NP-Za-km-z]+$/.test(sourcePrivateKey)
-      ) {
-        // Solana private key (Base58 encoded) - convert to hex first
-        sourceBlockchain = "Solana";
-        const decoded = bs58check.decode(sourcePrivateKey);
-        const hexKey = Array.from(decoded.slice(0, 32))
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
-        walletResult = convertHexToRippleWallet(hexKey);
+      
       } else {
         // Try to decode as WIF (FLO or other)
         try {
@@ -1855,7 +1680,7 @@ async function generateXRPAddress() {
           walletResult = convertWIFtoRippleWallet(sourcePrivateKey);
         } catch (e) {
           throw new Error(
-            "Unsupported private key format. Please use BTC WIF, FLO WIF, ETH (0x...), SOL, BNB, or MATIC private key."
+            "Unsupported private key format. Please use BTC WIF, FLO WIF private key."
           );
         }
       }
@@ -1877,25 +1702,7 @@ async function generateXRPAddress() {
                 </div>
               </div>
               <div class="detail-row">
-                <label>Public Key:</label>
-                <div class="value-container">
-                  <code>${walletResult.publicKey}</code>
-                  <button onclick="copyToClipboard('${walletResult.publicKey}')" class="btn-copy">
-                    <i class="fas fa-copy"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="detail-row">
-                <label>Private Key (Hex):</label>
-                <div class="value-container">
-                  <code>${walletResult.privateKey}</code>
-                  <button onclick="copyToClipboard('${walletResult.privateKey}')" class="btn-copy">
-                    <i class="fas fa-copy"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="detail-row">
-                <label>Original Key:</label>
+                <label>Seed:</label>
                 <div class="value-container">
                   <code>${walletResult.seed}</code>
                   <button onclick="copyToClipboard('${walletResult.seed}')" class="btn-copy">
@@ -2155,32 +1962,9 @@ async function retrieveXRPAddress() {
                 </button>
               </div>
             </div>
+            
             <div class="detail-row">
-              <label>Public Key:</label>
-              <div class="value-container">
-                <code>${walletResult.publicKey}</code>
-                <button onclick="copyToClipboard('${
-                  walletResult.publicKey
-                }')" class="btn-copy">
-                  <i class="fas fa-copy"></i>
-                </button>
-              </div>
-            </div>
-            <div class="detail-row">
-              <label>Private Key (Hex):</label>
-              <div class="value-container">
-                <code>${walletResult.privateKey}</code>
-                <button onclick="copyToClipboard('${
-                  walletResult.privateKey
-                }')" class="btn-copy">
-                  <i class="fas fa-copy"></i>
-                </button>
-              </div>
-            </div>
-            <div class="detail-row">
-              <label>Original ${
-                sourceType === "XRP Seed" ? "Seed" : "Key"
-              }:</label>
+              <label>Seed</label>
               <div class="value-container">
                 <code>${walletResult.seed}</code>
                 <button onclick="copyToClipboard('${
@@ -2221,74 +2005,6 @@ async function retrieveXRPAddress() {
   }
 }
 
-async function retrieveFLOAddress() {
-  const keyInput = document.getElementById("recoverKey");
-  if (!keyInput || !keyInput.value.trim()) {
-    notify("Please enter a private key", "error");
-    return;
-  }
-
-  try {
-    notify("Retrieving FLO address...", "info");
-
-    const privateKey = keyInput.value.trim();
-
-    // Convert to entropy for FLO address generation
-    let entropy;
-    if (privateKey.startsWith("s")) {
-      // Ripple seed
-      const wallet = xrpl.Wallet.fromSeed(privateKey);
-      entropy = hexToUint8Array(wallet.privateKey);
-    } else {
-      // WIF or hex key
-      const wallet = convertWIFtoRippleWallet(privateKey);
-      entropy = hexToUint8Array(wallet.privateKey);
-    }
-
-    const floResult = await generateBitcoinAddress(entropy);
-
-    if (!floResult) {
-      throw new Error("Failed to retrieve FLO address");
-    }
-
-    // Display result
-    const outputDiv = document.getElementById("recoveryOutput");
-    if (outputDiv) {
-      outputDiv.innerHTML = `
-        <div class="wallet-result">
-          <h3><i class="fas fa-seedling"></i> FLO Address Retrieved</h3>
-          <div class="wallet-details">
-            <div class="detail-row">
-              <label>Address:</label>
-              <div class="value-container">
-                <code>${floResult.flo.address}</code>
-                <button onclick="copyToClipboard('${floResult.flo.address}')" class="btn-copy">
-                  <i class="fas fa-copy"></i>
-                </button>
-              </div>
-            </div>
-            <div class="detail-row">
-              <label>WIF Private Key:</label>
-              <div class="value-container">
-                <code>${floResult.flo.wif}</code>
-                <button onclick="copyToClipboard('${floResult.flo.wif}')" class="btn-copy">
-                  <i class="fas fa-copy"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      outputDiv.style.display = "block";
-    }
-
-    notify("FLO address retrieved successfully!", "success");
-  } catch (error) {
-    console.error("FLO retrieval error:", error);
-    notify("Failed to retrieve FLO address: " + error.message, "error");
-  }
-}
-
 // Helper function for copying to clipboard
 function copyToClipboard(text) {
   navigator.clipboard
@@ -2320,7 +2036,7 @@ function hexToUint8Array(hex) {
 
 window.connectWallet = connectWallet;
 window.sendXRP = sendXRP;
-window.generateWallet = generateWallet;
+
 window.generateXRPAddress = generateXRPAddress;
 window.recoverWallet = recoverWallet;
 window.retrieveXRPAddress = retrieveXRPAddress;
@@ -2337,7 +2053,7 @@ window.closePopup = closePopup;
 window.lookupTransactions = lookupTransactions;
 window.getWalletFromPrivateKey = getWalletFromPrivateKey;
 window.convertWIFtoRippleWallet = convertWIFtoRippleWallet;
-window.convertHexToRippleWallet = convertHexToRippleWallet;
+
 window.setTransactionFilter = setTransactionFilter;
 window.goToPreviousPage = goToPreviousPage;
 window.goToNextPage = goToNextPage;

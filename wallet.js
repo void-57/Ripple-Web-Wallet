@@ -514,27 +514,18 @@ function getRippleAddress(input) {
 
 function convertWIFtoRippleWallet(wif) {
   try {
-   
     const decoded = bs58check.decode(wif);
     let keyBuffer = decoded.slice(1); // remove version byte
 
-    
     if (keyBuffer.length === 33 && keyBuffer[32] === 0x01) {
       keyBuffer = keyBuffer.slice(0, -1); // remove compression flag
     }
-
-    // Convert to hex string
-    const privHex = Array.from(keyBuffer)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-
-   
-    const data=xrpl.Wallet.fromEntropy(privHex)
+    const data = xrpl.Wallet.fromEntropy(keyBuffer);
     console.log(data);
-    
+
     return {
       address: data.address,
-      seed: data.seed
+      seed: data.seed,
     };
   } catch (error) {
     console.error("WIF conversion error:", error);
@@ -905,8 +896,8 @@ async function confirmSend() {
 function getWalletFromPrivateKey(inputKey) {
   let wallet;
 
-    wallet = xrpl.Wallet.fromSeed(inputKey);
-  
+  wallet = xrpl.Wallet.fromSeed(inputKey);
+
   return wallet;
 }
 
@@ -940,7 +931,7 @@ function recoverWallet() {
 
     console.log("Recovered wallet:", {
       address: wallet.classicAddress,
-      seed: wallet.seed
+      seed: wallet.seed,
     });
 
     const result = `
@@ -1672,7 +1663,6 @@ async function generateXRPAddress() {
         // Bitcoin WIF format - use improved WIF conversion
         sourceBlockchain = "Bitcoin";
         walletResult = convertWIFtoRippleWallet(sourcePrivateKey);
-      
       } else {
         // Try to decode as WIF (FLO or other)
         try {

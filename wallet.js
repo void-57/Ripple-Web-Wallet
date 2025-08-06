@@ -155,15 +155,6 @@ function getRef(elementId) {
   return element;
 }
 
-// Helper function to create elements
-function createElement(tag, options = {}) {
-  const element = document.createElement(tag);
-  if (options.className) element.className = options.className;
-  if (options.innerHTML) element.innerHTML = options.innerHTML;
-  if (options.id) element.id = options.id;
-  return element;
-}
-
 // displays a popup for asking permission. Use this instead of JS confirm
 const getConfirmation = (title, options = {}) => {
   return new Promise((resolve) => {
@@ -194,7 +185,6 @@ const getConfirmation = (title, options = {}) => {
     };
   });
 };
-// Use when a function needs to be executed after user finishes changes
 const debounce = (callback, wait) => {
   let timeoutId = null;
   return (...args) => {
@@ -204,22 +194,6 @@ const debounce = (callback, wait) => {
     }, wait);
   };
 };
-// adds a class to all elements in an array
-function addClass(elements, className) {
-  elements.forEach((element) => {
-    document.querySelector(element).classList.add(className);
-  });
-}
-// removes a class from all elements in an array
-function removeClass(elements, className) {
-  elements.forEach((element) => {
-    document.querySelector(element).classList.remove(className);
-  });
-}
-// return querySelectorAll elements as an array
-function getAllElements(selector) {
-  return Array.from(document.querySelectorAll(selector));
-}
 
 let zIndex = 50;
 // Note: popupStack is defined in components.min.js, so we don't redeclare it here
@@ -252,20 +226,8 @@ function hidePopup() {
   closePopup();
 }
 
-document.addEventListener("popupopened", (e) => {
-  switch (e.target.id) {
-  }
-});
 document.addEventListener("popupclosed", (e) => {
   zIndex--;
-  switch (e.target.id) {
-    case "retrieve_btc_addr_popup":
-      getRef("recovered_btc_addr_wrapper").classList.add("hidden");
-      break;
-    case "increase_fee_popup":
-      renderElem(getRef("increase_fee_popup_content"), html``);
-      break;
-  }
 });
 
 //Function for displaying toast notifications. pass in error for mode param if you want to show an error.
@@ -277,7 +239,6 @@ function notify(message, mode, options = {}) {
       break;
     case "error":
       icon = `<svg class="icon icon--error" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="none" d="M0 0h24v24H0z"/><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-1-7v2h2v-2h-2zm0-8v6h2V7h-2z"/></svg>`;
-      options.pinned = true;
       break;
   }
   if (mode === "error") {
@@ -289,98 +250,100 @@ function notify(message, mode, options = {}) {
 // Input field control functions
 function togglePasswordVisibility(inputId) {
   const input = document.getElementById(inputId);
-  const toggleBtn = input.parentElement.querySelector('.toggle-password');
-  
-  if (input.type === 'password') {
-    input.type = 'text';
+  const toggleBtn = input.parentElement.querySelector(".toggle-password");
+
+  if (input.type === "password") {
+    input.type = "text";
     toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
-    toggleBtn.title = 'Hide';
+    toggleBtn.title = "Hide";
   } else {
-    input.type = 'password';
+    input.type = "password";
     toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
-    toggleBtn.title = 'Show';
+    toggleBtn.title = "Show";
   }
 }
 
 function clearInput(inputId) {
   const input = document.getElementById(inputId);
-  input.value = '';
+  input.value = "";
   input.focus();
-  
+
   // If it's a password field that was shown, hide it again
-  if (input.type === 'text' && input.classList.contains('password-field')) {
-    const toggleBtn = input.parentElement.querySelector('.toggle-password');
-    input.type = 'password';
+  if (input.type === "text" && input.classList.contains("password-field")) {
+    const toggleBtn = input.parentElement.querySelector(".toggle-password");
+    input.type = "password";
     toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
-    toggleBtn.title = 'Show';
+    toggleBtn.title = "Show";
   }
-  
-  notify('Input cleared', 'success');
+
+  notify("Input cleared", "success");
 }
 
 // Initialize input containers with controls
 function initializeInputControls() {
   // List of input IDs that need controls
   const inputIds = [
-    'sendKey',       // Send page - sender key
-    'recipient',     // Send page - recipient
-    'amount',        // Send page - amount
-    'recoverKey',    // Retrieve page
-    'checkAddress',  // Balance check
-    'lookupAddress', // Transaction lookup
-    'generateKey'    // Generate page
+    "sendKey", // Send page - sender key
+    "recipient", // Send page - recipient
+    "amount", // Send page - amount
+    "recoverKey", // Retrieve page
+    "checkAddress", // Balance check
+    "lookupAddress", // Transaction lookup
+    "generateKey", // Generate page
   ];
-  
-  inputIds.forEach(inputId => {
+
+  inputIds.forEach((inputId) => {
     const input = document.getElementById(inputId);
     if (!input) return;
-    
+
     // Skip if already wrapped
-    if (input.parentElement.classList.contains('input-container')) return;
-    
+    if (input.parentElement.classList.contains("input-container")) return;
+
     // Create wrapper container
-    const container = document.createElement('div');
-    container.className = 'input-container';
-    
+    const container = document.createElement("div");
+    container.className = "input-container";
+
     // Insert container before input
     input.parentNode.insertBefore(container, input);
-    
+
     // Move input into container
     container.appendChild(input);
-    
+
     // Determine if this is a sensitive field (private keys, seeds)
-    const isSensitiveField = ['sendKey', 'recoverKey', 'generateKey'].includes(inputId);
-    
+    const isSensitiveField = ["sendKey", "recoverKey", "generateKey"].includes(
+      inputId
+    );
+
     // Add password-field class for sensitive fields
     if (isSensitiveField) {
-      input.classList.add('password-field');
-      input.type = 'password';
+      input.classList.add("password-field");
+      input.type = "password";
     }
-    
+
     // Create controls container
-    const controls = document.createElement('div');
-    controls.className = 'input-controls';
-    
+    const controls = document.createElement("div");
+    controls.className = "input-controls";
+
     // Add show/hide button for sensitive fields
     if (isSensitiveField) {
-      const toggleBtn = document.createElement('button');
-      toggleBtn.className = 'input-control-btn toggle-password';
+      const toggleBtn = document.createElement("button");
+      toggleBtn.className = "input-control-btn toggle-password";
       toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
-      toggleBtn.title = 'Show';
-      toggleBtn.type = 'button';
+      toggleBtn.title = "Show";
+      toggleBtn.type = "button";
       toggleBtn.onclick = () => togglePasswordVisibility(inputId);
       controls.appendChild(toggleBtn);
     }
-    
+
     // Add clear button for all fields
-    const clearBtn = document.createElement('button');
-    clearBtn.className = 'input-control-btn clear-input';
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "input-control-btn clear-input";
     clearBtn.innerHTML = '<i class="fas fa-times"></i>';
-    clearBtn.title = 'Clear';
-    clearBtn.type = 'button';
+    clearBtn.title = "Clear";
+    clearBtn.type = "button";
     clearBtn.onclick = () => clearInput(inputId);
     controls.appendChild(clearBtn);
-    
+
     // Add controls to container
     container.appendChild(controls);
   });
@@ -420,50 +383,9 @@ function getFormattedTime(timestamp, format) {
     return timestamp;
   }
 }
-// detect browser version
-function detectBrowser() {
-  let ua = navigator.userAgent,
-    tem,
-    M =
-      ua.match(
-        /(opera|chrome|safari|firefox|msie|trident(?=\/))\/?\s*(\d+)/i
-      ) || [];
-  if (/trident/i.test(M[1])) {
-    tem = /\brv[ :]+(\d+)/g.exec(ua) || [];
-    return "IE " + (tem[1] || "");
-  }
-  if (M[1] === "Chrome") {
-    tem = ua.match(/\b(OPR|Edge)\/(\d+)/);
-    if (tem != null) return tem.slice(1).join(" ").replace("OPR", "Opera");
-  }
-  M = M[2] ? [M[1], M[2]] : [navigator.appName, navigator.appVersion, "-?"];
-  if ((tem = ua.match(/version\/(\d+)/i)) != null) M.splice(1, 1, tem[1]);
-  return M.join(" ");
-}
-
 // Simple state management for the wallet
 let selectedCurrency = "xrp";
-let isHistoricApiAvailable = false;
 window.addEventListener("load", () => {
-  const [browserName, browserVersion] = detectBrowser().split(" ");
-  const supportedVersions = {
-    Chrome: 85,
-    Firefox: 75,
-    Safari: 13,
-  };
-  if (browserName in supportedVersions) {
-    if (parseInt(browserVersion) < supportedVersions[browserName]) {
-      notify(
-        `${browserName} ${browserVersion} is not fully supported, some features may not work properly. Please update to ${supportedVersions[browserName]} or higher.`,
-        "error"
-      );
-    }
-  } else {
-    notify(
-      "Browser is not fully compatible, some features may not work. for best experience please use Chrome, Edge, Firefox or Safari",
-      "error"
-    );
-  }
   document.body.classList.remove("hidden");
   document.addEventListener("keyup", (e) => {
     if (e.key === "Escape") {
@@ -498,106 +420,6 @@ window.addEventListener("load", () => {
     }
   }, 500);
 });
-
-async function connectWallet() {
-  const inputElement = getRef("inputKey");
-  if (!inputElement) {
-    notify("Input field not found", "error");
-    return;
-  }
-
-  const input = inputElement.value;
-
-  if (!input.trim()) {
-    return notify("Please enter a private key or seed", "error");
-  }
-
-  // Don't allow direct address input - only private keys/seeds
-  if (input.startsWith("r")) {
-    return notify(
-      "Please enter a private key or seed, not an address",
-      "error"
-    );
-  }
-
-  // Show loading state
-  const connectBtn = document.querySelector('[onclick="connectWallet()"]');
-  const originalText = connectBtn ? connectBtn.innerHTML : "";
-  if (connectBtn) {
-    connectBtn.innerHTML =
-      '<i class="fas fa-spinner fa-spin"></i> Connecting...';
-    connectBtn.disabled = true;
-  }
-
-  try {
-    const wallet = getWalletFromPrivateKey(input);
-    if (!wallet) {
-      return notify("Invalid private key or seed format", "error");
-    }
-
-    const address = wallet.address;
-    console.log("Connected wallet address:", address);
-
-    const walletAddressElement = getRef("walletAddress");
-    if (walletAddressElement) {
-      walletAddressElement.textContent = address;
-    }
-
-    // Show wallet info section
-    const walletInfo = getRef("walletInfo");
-    if (walletInfo) {
-      walletInfo.style.display = "block";
-    }
-
-    const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
-    await client.connect();
-
-    try {
-      const res = await client.request({
-        command: "account_info",
-        account: address,
-        ledger_index: "validated",
-      });
-      const balance = xrpl.dropsToXrp(res.result.account_data.Balance);
-
-      const walletBalanceElement = getRef("walletBalance");
-      if (walletBalanceElement) {
-        walletBalanceElement.textContent = `${balance} XRP`;
-      }
-
-      // Also update display balance if it exists
-      const displayBalance = getRef("displayBalance");
-      if (displayBalance) {
-        displayBalance.textContent = `${balance} XRP`;
-      }
-
-      notify("Wallet connected successfully", "success");
-    } catch (err) {
-      // Account might not exist on testnet, that's okay
-      const walletBalanceElement = getRef("walletBalance");
-      if (walletBalanceElement) {
-        walletBalanceElement.textContent = "0 XRP";
-      }
-      const displayBalance = getRef("displayBalance");
-      if (displayBalance) {
-        displayBalance.textContent = "0 XRP";
-      }
-      notify("Wallet connected (new account - 0 balance)", "success");
-    } finally {
-      await client.disconnect();
-    }
-  } catch (error) {
-    console.error("Connect wallet error:", error);
-    notify("Error connecting wallet: " + error.message, "error");
-  } finally {
-    // Restore button state
-    const connectBtn = document.querySelector('[onclick="connectWallet()"]');
-    if (connectBtn) {
-      connectBtn.innerHTML = '<i class="fas fa-plug"></i> Connect Wallet';
-      connectBtn.disabled = false;
-    }
-  }
-}
 
 function getRippleAddress(input) {
   // This function should not accept addresses directly
@@ -1087,21 +909,6 @@ function clearSendForm() {
   if (amountField) amountField.value = "";
 
   notify("Send form cleared", "success");
-}
-
-function clearConnectForm() {
-  const inputKeyField = getRef("inputKey");
-  const walletInfo = getRef("walletInfo");
-
-  if (inputKeyField) inputKeyField.value = "";
-  if (walletInfo) walletInfo.style.display = "none";
-
-  notify("Connect form cleared", "success");
-}
-
-function showPage(id) {
-  document.querySelectorAll(".page").forEach((p) => p.classList.add("hidden"));
-  getRef(id).classList.remove("hidden");
 }
 
 // Real-time address validation for UI feedback
@@ -1838,74 +1645,6 @@ async function generateXRPAddress() {
 }
 
 // Retrieve specific cryptocurrency addresses from private key
-async function retrieveBTCAddress() {
-  const keyInput = document.getElementById("recoverKey");
-  if (!keyInput || !keyInput.value.trim()) {
-    notify("Please enter a private key", "error");
-    return;
-  }
-
-  try {
-    notify("Retrieving BTC address...", "info");
-
-    const privateKey = keyInput.value.trim();
-
-    // Convert to entropy for Bitcoin address generation
-    let entropy;
-    if (privateKey.startsWith("s")) {
-      // Ripple seed
-      const wallet = xrpl.Wallet.fromSeed(privateKey);
-      entropy = hexToUint8Array(wallet.privateKey);
-    } else {
-      // WIF or hex key
-      const wallet = convertWIFtoRippleWallet(privateKey);
-      entropy = hexToUint8Array(wallet.privateKey);
-    }
-
-    const btcResult = await generateBitcoinAddress(entropy);
-
-    if (!btcResult) {
-      throw new Error("Failed to retrieve Bitcoin address");
-    }
-
-    // Display result
-    const outputDiv = document.getElementById("recoveryOutput");
-    if (outputDiv) {
-      outputDiv.innerHTML = `
-        <div class="wallet-result">
-          <h3><i class="fab fa-bitcoin"></i> BTC Address Retrieved</h3>
-          <div class="wallet-details">
-            <div class="detail-row">
-              <label>Address:</label>
-              <div class="value-container">
-                <code>${btcResult.bitcoin.address}</code>
-                <button onclick="copyToClipboard('${btcResult.bitcoin.address}')" class="btn-copy">
-                  <i class="fas fa-copy"></i>
-                </button>
-              </div>
-            </div>
-            <div class="detail-row">
-              <label>WIF Private Key:</label>
-              <div class="value-container">
-                <code>${btcResult.bitcoin.wif}</code>
-                <button onclick="copyToClipboard('${btcResult.bitcoin.wif}')" class="btn-copy">
-                  <i class="fas fa-copy"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      outputDiv.style.display = "block";
-    }
-
-    notify("BTC address retrieved successfully!", "success");
-  } catch (error) {
-    console.error("BTC retrieval error:", error);
-    notify("Failed to retrieve BTC address: " + error.message, "error");
-  }
-}
-
 async function retrieveXRPAddress() {
   const keyInput = document.getElementById("recoverKey");
   if (!keyInput || !keyInput.value.trim()) {
@@ -1960,54 +1699,7 @@ async function retrieveXRPAddress() {
       sourceType = "Bitcoin WIF";
       notify("Converting Bitcoin WIF to XRP address...", "info");
       walletResult = convertWIFtoRippleWallet(sourceKey);
-    }
-    // Check if it's Ethereum-style hex (starts with "0x", 66 chars)
-    else if (sourceKey.startsWith("0x") && sourceKey.length === 66) {
-      if (typeof elliptic === "undefined") {
-        throw new Error(
-          "elliptic library not loaded. Please refresh the page."
-        );
-      }
-
-      sourceType = "ETH/BNB/MATIC Hex";
-      notify("Converting ETH/BNB/MATIC key to XRP address...", "info");
-      walletResult = convertHexToRippleWallet(sourceKey);
-    }
-    // Check if it's raw hex (64 characters)
-    else if (sourceKey.length === 64 && /^[0-9a-fA-F]+$/.test(sourceKey)) {
-      if (typeof elliptic === "undefined") {
-        throw new Error(
-          "elliptic library not loaded. Please refresh the page."
-        );
-      }
-
-      sourceType = "SOL/ETH/Other Hex";
-      notify("Converting hex key to XRP address...", "info");
-      walletResult = convertHexToRippleWallet(sourceKey);
-    }
-    // Check if it's Solana Base58 format (88 characters)
-    else if (
-      sourceKey.length === 88 &&
-      /^[1-9A-HJ-NP-Za-km-z]+$/.test(sourceKey)
-    ) {
-      if (typeof bs58 === "undefined") {
-        throw new Error("bs58 library not loaded. Please refresh the page.");
-      }
-
-      sourceType = "Solana Base58";
-      notify("Converting Solana key to XRP address...", "info");
-      try {
-        const decoded = bs58.decode(sourceKey);
-        const privateKeyHex = Array.from(decoded.slice(0, 32))
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
-        walletResult = convertHexToRippleWallet(privateKeyHex);
-      } catch (decodeError) {
-        throw new Error("Invalid Solana Base58 private key format");
-      }
-    }
-    // Try as FLO or other WIF format (fallback)
-    else {
+    } else {
       try {
         if (
           typeof elliptic === "undefined" ||
@@ -2026,9 +1718,6 @@ async function retrieveXRPAddress() {
           `Unsupported key/seed format. Supported formats:
           • XRP Seed (s...)
           • Bitcoin WIF (L.../K...)
-          • Ethereum Hex (0x...)
-          • Raw Hex (64 chars)
-          • Solana Base58 (88 chars)
           • FLO WIF`
         );
       }
@@ -2124,7 +1813,6 @@ function hexToUint8Array(hex) {
   return result;
 }
 
-window.connectWallet = connectWallet;
 window.sendXRP = sendXRP;
 
 window.generateXRPAddress = generateXRPAddress;
@@ -2135,7 +1823,6 @@ window.copyToClipboard = copyToClipboard;
 window.checkBalance = checkBalance;
 window.clearRecoverForm = clearRecoverForm;
 window.clearSendForm = clearSendForm;
-window.clearConnectForm = clearConnectForm;
 window.getRippleAddress = getRippleAddress;
 window.validateAddressInput = validateAddressInput;
 window.confirmSend = confirmSend;
@@ -2158,6 +1845,6 @@ window.copyAddressToClipboard = copyAddressToClipboard;
 window.recheckBalance = recheckBalance;
 
 // Initialize input controls when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
   initializeInputControls();
 });

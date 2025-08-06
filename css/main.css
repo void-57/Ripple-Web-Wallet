@@ -504,13 +504,13 @@ body {
     right: 0.25rem;
     gap: 0.125rem;
   }
-  
+
   .input-control-btn {
     width: 20px;
     height: 20px;
     font-size: 0.75rem;
   }
-  
+
   .input-container input {
     padding-right: 3.5rem !important;
   }
@@ -860,33 +860,6 @@ body {
   text-align: center;
 }
 
-.qr-container {
-  margin-bottom: 2rem;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 200px;
-}
-
-.qr-placeholder {
-  background: var(--background-color);
-  border: 2px dashed var(--border-color);
-  border-radius: var(--border-radius);
-  padding: 3rem 2rem;
-  color: var(--text-secondary);
-}
-
-.qr-placeholder i {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  display: block;
-}
-
-#qrCanvas {
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-md);
-}
-
 .address-section {
   text-align: left;
 }
@@ -1151,44 +1124,9 @@ body {
   text-overflow: ellipsis;
 }
 
-.no-transactions {
-  text-align: center;
-  padding: 3rem 2rem;
-  color: var(--text-secondary);
-}
-
-.no-transactions i {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  display: block;
-}
-
 /* Generate & Recover Pages */
 .generate-info {
   margin-bottom: 2rem;
-}
-
-.info-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.info-item i {
-  color: var(--primary-color);
-  font-size: 1.25rem;
-  margin-top: 0.25rem;
-}
-
-.info-item h4 {
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-}
-
-.info-item p {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
 }
 
 /* Transaction Filter and Pagination Controls */
@@ -1382,15 +1320,6 @@ body {
   }
 }
 
-.output-card {
-  background: linear-gradient(
-    135deg,
-    rgba(16, 185, 129, 0.05),
-    rgba(16, 185, 129, 0.1)
-  );
-  border: 2px solid var(--success-color);
-}
-
 .wallet-generated h3,
 .wallet-recovered h3 {
   display: flex;
@@ -1400,29 +1329,8 @@ body {
   margin-bottom: 1.5rem;
 }
 
-.wallet-details {
-  margin-bottom: 1.5rem;
-}
-
-.wallet-item {
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-sm);
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.wallet-item h4 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  font-weight: 600;
-}
-
 .detail-row {
   display: flex;
-
   align-items: center;
   margin-bottom: 0.5rem;
 }
@@ -2085,32 +1993,6 @@ sm-popup::part(popup) {
     min-height: calc(100vh - 80px);
     margin-top: 0;
   }
-}
-
-/* Utility Classes */
-.text-center {
-  text-align: center;
-}
-.text-right {
-  text-align: right;
-}
-.mt-1 {
-  margin-top: 0.25rem;
-}
-.mt-2 {
-  margin-top: 0.5rem;
-}
-.mb-1 {
-  margin-bottom: 0.25rem;
-}
-.mb-2 {
-  margin-bottom: 0.5rem;
-}
-.p-1 {
-  padding: 0.25rem;
-}
-.p-2 {
-  padding: 0.5rem;
 }
 
 /* Notification System - Opaque Backgrounds */

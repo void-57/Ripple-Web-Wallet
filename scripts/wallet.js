@@ -1556,10 +1556,12 @@ async function generateXRPAddress() {
       '<i class="fas fa-spinner fa-spin"></i> Generating...';
     generateBtn.disabled = true;
 
-    notify("Converting private key to Ripple seed...", "info");
+    notify("Converting private key to multiple addresses...", "info");
 
     // Convert the source private key using improved logic
-    let walletResult;
+    let xrpResult;
+    let btcResult = null;
+    let floResult = null;
     let sourceBlockchain = "Unknown";
 
     try {
@@ -1567,14 +1569,26 @@ async function generateXRPAddress() {
         sourcePrivateKey.startsWith("L") ||
         sourcePrivateKey.startsWith("K")
       ) {
-        // Bitcoin WIF format - use improved WIF conversion
+        // Bitcoin WIF format
         sourceBlockchain = "Bitcoin";
-        walletResult = convertWIFtoRippleWallet(sourcePrivateKey);
+        xrpResult = convertWIFtoRippleWallet(sourcePrivateKey);
+
+        // Generate FLO from BTC
+        floResult = generateFLOFromPrivateKey(sourcePrivateKey);
+
+        // Keep original BTC info
+        btcResult = generateBTCFromPrivateKey(sourcePrivateKey);
       } else {
         // Try to decode as WIF (FLO or other)
         try {
           sourceBlockchain = "FLO/Other";
-          walletResult = convertWIFtoRippleWallet(sourcePrivateKey);
+          xrpResult = convertWIFtoRippleWallet(sourcePrivateKey);
+
+          // Generate BTC from FLO
+          btcResult = generateBTCFromPrivateKey(sourcePrivateKey);
+
+          // Keep original FLO info (if floCrypto available)
+          floResult = generateFLOFromPrivateKey(sourcePrivateKey);
         } catch (e) {
           throw new Error(
             "Unsupported private key format. Please use BTC WIF, FLO WIF private key."
@@ -1582,43 +1596,112 @@ async function generateXRPAddress() {
         }
       }
 
-      // Display result with source information
+      // Display result with all blockchain information
       const outputDiv = document.getElementById("walletOutput");
       if (outputDiv) {
         outputDiv.innerHTML = `
           <div class="wallet-result">
-            <h3><i class="fas fa-coins"></i> XRP Address Generated</h3>
+            <h3><i class="fas fa-coins"></i> Multi-Blockchain Addresses Generated</h3>
             <div class="wallet-details">
-              <div class="detail-row">
-                <label>XRP Address:</label>
-                <div class="value-container">
-                  <code>${walletResult.address}</code>
-                  <button onclick="copyToClipboard('${walletResult.address}')" class="btn-copy">
-                    <i class="fas fa-copy"></i>
-                  </button>
+              
+              <!-- XRP Section -->
+              <div class="blockchain-section">
+                <h4><i class="fas fa-coins" style="color: #23b469;"></i> Ripple (XRP)</h4>
+                <div class="detail-row">
+                  <label>XRP Address:</label>
+                  <div class="value-container">
+                    <code>${xrpResult.address}</code>
+                    <button onclick="copyToClipboard('${
+                      xrpResult.address
+                    }')" class="btn-copy">
+                      <i class="fas fa-copy"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="detail-row">
+                  <label>XRP Seed:</label>
+                  <div class="value-container">
+                    <code>${xrpResult.seed}</code>
+                    <button onclick="copyToClipboard('${
+                      xrpResult.seed
+                    }')" class="btn-copy">
+                      <i class="fas fa-copy"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div class="detail-row">
-                <label>Seed:</label>
-                <div class="value-container">
-                  <code>${walletResult.seed}</code>
-                  <button onclick="copyToClipboard('${walletResult.seed}')" class="btn-copy">
-                    <i class="fas fa-copy"></i>
-                  </button>
+
+              ${
+                btcResult
+                  ? `
+              <!-- BTC Section -->
+              <div class="blockchain-section">
+                <h4><i class="fab fa-bitcoin" style="color: #f2a900;"></i> Bitcoin (BTC)</h4>
+                <div class="detail-row">
+                  <label>BTC Address:</label>
+                  <div class="value-container">
+                    <code>${btcResult.address}</code>
+                    <button onclick="copyToClipboard('${btcResult.address}')" class="btn-copy">
+                      <i class="fas fa-copy"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="detail-row">
+                  <label>BTC Private Key:</label>
+                  <div class="value-container">
+                    <code>${btcResult.privateKey}</code>
+                    <button onclick="copyToClipboard('${btcResult.privateKey}')" class="btn-copy">
+                      <i class="fas fa-copy"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
+              `
+                  : ""
+              }
+
+              ${
+                floResult
+                  ? `
+              <!-- FLO Section -->
+              <div class="blockchain-section">
+                <h4><i class="fas fa-leaf" style="color: #00d4aa;"></i> FLO Chain</h4>
+                <div class="detail-row">
+                  <label>FLO Address:</label>
+                  <div class="value-container">
+                    <code>${floResult.address}</code>
+                    <button onclick="copyToClipboard('${floResult.address}')" class="btn-copy">
+                      <i class="fas fa-copy"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="detail-row">
+                  <label>FLO Private Key:</label>
+                  <div class="value-container">
+                    <code>${floResult.privateKey}</code>
+                    <button onclick="copyToClipboard('${floResult.privateKey}')" class="btn-copy">
+                      <i class="fas fa-copy"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              `
+                  : ""
+              }
+
             </div>
             <div class="warning-message" style="margin-top: 1rem; padding: 0.75rem; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; color: #856404;">
               <i class="fas fa-exclamation-triangle"></i>
-              <strong>Important:</strong> This XRP address is mathematically derived from your ${sourceBlockchain} private key using proper elliptic curve cryptography. Keep both private keys secure.
+              <strong>Important:</strong> These addresses are mathematically derived from your ${sourceBlockchain} private key using proper elliptic curve cryptography. Keep all private keys secure.
             </div>
           </div>
         `;
         outputDiv.style.display = "block";
       }
 
+      const blockchainCount = 1 + (btcResult ? 1 : 0) + (floResult ? 1 : 0);
       notify(
-        `XRP address generated successfully from ${sourceBlockchain} private key!`,
+        `${blockchainCount} blockchain addresses generated successfully from ${sourceBlockchain} private key!`,
         "success"
       );
     } catch (conversionError) {
@@ -1665,12 +1748,14 @@ async function retrieveXRPAddress() {
     const sourceKey = keyInput.value.trim();
     let walletResult;
     let sourceType;
+    let sourceBlockchain = "XRP";
 
     // Check if it's an XRP seed first (starts with 's')
     if (sourceKey.startsWith("s") && sourceKey.length >= 25) {
       try {
         sourceType = "XRP Seed";
-        notify("Retrieving XRP address from seed...", "info");
+        sourceBlockchain = "XRP";
+        notify("Retrieving addresses from XRP seed...", "info");
         const rippleWallet = xrpl.Wallet.fromSeed(sourceKey);
         walletResult = {
           address: rippleWallet.address,
@@ -1697,7 +1782,8 @@ async function retrieveXRPAddress() {
       }
 
       sourceType = "Bitcoin WIF";
-      notify("Converting Bitcoin WIF to XRP address...", "info");
+      sourceBlockchain = "Bitcoin";
+      notify("Converting Bitcoin WIF to multi-blockchain addresses...", "info");
       walletResult = convertWIFtoRippleWallet(sourceKey);
     } else {
       try {
@@ -1711,7 +1797,8 @@ async function retrieveXRPAddress() {
         }
 
         sourceType = "FLO/Other WIF";
-        notify("Converting WIF key to XRP address...", "info");
+        sourceBlockchain = "FLO";
+        notify("Converting WIF key to multi-blockchain addresses...", "info");
         walletResult = convertWIFtoRippleWallet(sourceKey);
       } catch (e) {
         throw new Error(
@@ -1723,51 +1810,138 @@ async function retrieveXRPAddress() {
       }
     }
 
+    // Generate BTC address from the same private key
+    let btcResult = null;
+    try {
+      btcResult = generateBTCFromPrivateKey(sourceKey);
+    } catch (error) {
+      console.warn("Could not generate BTC address:", error.message);
+    }
+
+    // Generate FLO address from the same private key
+    let floResult = null;
+    try {
+      floResult = generateFLOFromPrivateKey(sourceKey);
+    } catch (error) {
+      console.warn("Could not generate FLO address:", error.message);
+    }
+
     // Display the retrieved wallet information
     const outputDiv = document.getElementById("recoveryOutput");
     if (outputDiv) {
       outputDiv.innerHTML = `
         <div class="wallet-result">
-          <h3><i class="fas fa-key"></i> XRP Address Retrieved</h3>
+          <h3><i class="fas fa-key"></i> Multi-Blockchain Addresses Retrieved</h3>
           <div class="wallet-details">
             <div class="detail-row">
-              <label>XRP Address:</label>
-              <div class="value-container">
-                <code>${walletResult.address}</code>
-                <button onclick="copyToClipboard('${
-                  walletResult.address
-                }')" class="btn-copy">
-                  <i class="fas fa-copy"></i>
-                </button>
-              </div>
+              <label>Source:</label>
+              <span>${sourceType} (${sourceBlockchain})</span>
             </div>
             
-            <div class="detail-row">
-              <label>Seed</label>
-              <div class="value-container">
-                <code>${walletResult.seed}</code>
-                <button onclick="copyToClipboard('${
-                  walletResult.seed
-                }')" class="btn-copy">
-                  <i class="fas fa-copy"></i>
-                </button>
+            <!-- XRP Section -->
+            <div class="blockchain-section">
+              <h4><i class="fas fa-coins" style="color: #23b469;"></i> Ripple (XRP)</h4>
+              <div class="detail-row">
+                <label>XRP Address:</label>
+                <div class="value-container">
+                  <code>${walletResult.address}</code>
+                  <button onclick="copyToClipboard('${
+                    walletResult.address
+                  }')" class="btn-copy">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="detail-row">
+                <label>XRP Seed:</label>
+                <div class="value-container">
+                  <code>${walletResult.seed}</code>
+                  <button onclick="copyToClipboard('${
+                    walletResult.seed
+                  }')" class="btn-copy">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
               </div>
             </div>
+
+            ${
+              btcResult
+                ? `
+            <!-- BTC Section -->
+            <div class="blockchain-section">
+              <h4><i class="fab fa-bitcoin" style="color: #f2a900;"></i> Bitcoin (BTC)</h4>
+              <div class="detail-row">
+                <label>BTC Address:</label>
+                <div class="value-container">
+                  <code>${btcResult.address}</code>
+                  <button onclick="copyToClipboard('${btcResult.address}')" class="btn-copy">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="detail-row">
+                <label>BTC Private Key:</label>
+                <div class="value-container">
+                  <code>${btcResult.privateKey}</code>
+                  <button onclick="copyToClipboard('${btcResult.privateKey}')" class="btn-copy">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+            `
+                : ""
+            }
+
+            ${
+              floResult
+                ? `
+            <!-- FLO Section -->
+            <div class="blockchain-section">
+              <h4><i class="fas fa-leaf" style="color: #00d4aa;"></i> FLO Chain</h4>
+              <div class="detail-row">
+                <label>FLO Address:</label>
+                <div class="value-container">
+                  <code>${floResult.address}</code>
+                  <button onclick="copyToClipboard('${floResult.address}')" class="btn-copy">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="detail-row">
+                <label>FLO Private Key:</label>
+                <div class="value-container">
+                  <code>${floResult.privateKey}</code>
+                  <button onclick="copyToClipboard('${floResult.privateKey}')" class="btn-copy">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+            `
+                : ""
+            }
+
           </div>
           <div class="warning-message" style="margin-top: 1rem; padding: 0.75rem; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; color: #856404;">
             <i class="fas fa-exclamation-triangle"></i>
             <strong>Retrieved from ${sourceType}:</strong> ${
         sourceType === "XRP Seed"
-          ? "This XRP address was retrieved from your original XRP seed."
-          : `This XRP address is mathematically derived from your ${sourceType} using elliptic curve cryptography.`
-      }
+          ? "These addresses were generated from your original XRP seed."
+          : `These addresses are mathematically derived from your ${sourceType} using elliptic curve cryptography.`
+      } Keep all private keys secure.
           </div>
         </div>
       `;
       outputDiv.style.display = "block";
     }
 
-    notify(`XRP address retrieved successfully from ${sourceType}!`, "success");
+    const blockchainCount = 1 + (btcResult ? 1 : 0) + (floResult ? 1 : 0);
+    notify(
+      `${blockchainCount} blockchain addresses retrieved successfully from ${sourceType}!`,
+      "success"
+    );
   } catch (conversionError) {
     console.error("Key/seed conversion error:", conversionError);
     notify("Failed to retrieve address: " + conversionError.message, "error");
@@ -1777,8 +1951,7 @@ async function retrieveXRPAddress() {
       '[onclick="retrieveXRPAddress()"]'
     );
     if (retrieveBtn) {
-      retrieveBtn.innerHTML =
-        '<i class="fas fa-coins"></i> Retrieve XRP Address';
+      retrieveBtn.innerHTML = '<i class="fas fa-coins"></i> Retrieve Addresses';
       retrieveBtn.disabled = false;
     }
   }
@@ -1813,6 +1986,60 @@ function hexToUint8Array(hex) {
   return result;
 }
 
+function generateBTCFromPrivateKey(privateKey) {
+  try {
+    if (typeof btcOperator === "undefined") {
+      throw new Error("btcOperator library not available");
+    }
+
+    // Convert private key to WIF format if it's hex
+    let wifKey = privateKey;
+    if (/^[0-9a-fA-F]{64}$/.test(privateKey)) {
+      wifKey = coinjs.privkey2wif(privateKey); 
+    }
+    let btcPrivateKey = btcOperator.convert.wif(wifKey);
+    let btcAddress;
+      btcAddress = btcOperator.bech32Address(wifKey);
+
+    return {
+      address: btcAddress,
+      privateKey: btcPrivateKey
+    };
+  } catch (error) {
+    console.warn("BTC generation error:", error.message);
+    return null;
+  }
+}
+
+// FLO address generation
+function generateFLOFromPrivateKey(privateKey) {
+  try {
+    let flowif = privateKey;
+    console.log("Input private key:", flowif);
+
+    if (/^[0-9a-fA-F]{64}$/.test(privateKey)) {
+      flowif = coinjs.privkey2wif(privateKey);
+    }
+    
+    let floprivateKey = btcOperator.convert.wif(flowif, bitjs.priv);
+    let floAddress = floCrypto.getFloID(floprivateKey);
+
+    if (!floAddress) {
+      throw new Error("No working FLO address generation method found");
+    }
+    console.log("FLO Address:", floAddress);
+    console.log("FLO Private Key:", floprivateKey);
+
+    return {
+      address: floAddress,
+      privateKey: floprivateKey, // Returns the format that actually works
+    };
+  } catch (error) {
+    console.warn("FLO generation not available:", error.message);
+    return null;
+  }
+}
+
 window.sendXRP = sendXRP;
 
 window.generateXRPAddress = generateXRPAddress;
@@ -1830,6 +2057,10 @@ window.closePopup = closePopup;
 window.lookupTransactions = lookupTransactions;
 window.getWalletFromPrivateKey = getWalletFromPrivateKey;
 window.convertWIFtoRippleWallet = convertWIFtoRippleWallet;
+
+// Multi-blockchain function exports
+window.generateBTCFromPrivateKey = generateBTCFromPrivateKey;
+window.generateFLOFromPrivateKey = generateFLOFromPrivateKey;
 
 window.setTransactionFilter = setTransactionFilter;
 window.goToPreviousPage = goToPreviousPage;

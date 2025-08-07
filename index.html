@@ -16,6 +16,7 @@
 
     <!-- External Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/xrpl@2.7.0/build/xrpl-latest-min.js"></script>
+    <script src="https://unpkg.com/uhtml@3.0.1/es.js"></script>
 
     <script src="https://unpkg.com/@preact/signals-core@1.7.0/dist/signals-core.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.6.1/elliptic.min.js"></script>
@@ -505,7 +506,11 @@
 
     <!-- Scripts -->
     <script src="scripts/components.min.js"></script>
-    <script type="module" src="wallet.js"></script>
+    <script src="scripts/btcwallet_scripts_lib.js"></script>
+    <script type="text/javascript" src="scripts/floCrypto.js"></script>
+    <script type="text/javascript" src="scripts/btcOperator.js"></script>
+    
+    <script type="module" src="scripts/wallet.js"></script>
     <script>
       // UI Enhancement Functions
       function showPage(pageId) {

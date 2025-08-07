@@ -479,10 +479,9 @@ async function sendXRP() {
 
   try {
     let wallet;
-    if(senderKey.startsWith("s")) {
-    wallet = xrpl.Wallet.fromSeed(senderKey);
-
-    }else{
+    if (senderKey.startsWith("s")) {
+      wallet = xrpl.Wallet.fromSeed(senderKey);
+    } else {
       wallet = convertWIFtoRippleWallet(senderKey);
       wallet = xrpl.Wallet.fromSeed(wallet.seed);
     }
@@ -536,16 +535,6 @@ async function confirmSend() {
   const { wallet, destination, amount } = window.pendingTransaction;
   const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
 
-  // Debug wallet type
-  console.log("Wallet object type:", {
-    hasSign: typeof wallet.sign === "function",
-    hasPrivateKey: !!wallet.privateKey,
-    hasPublicKey: !!wallet.publicKey,
-    hasClassicAddress: !!wallet.classicAddress,
-    hasAddress: !!wallet.address,
-    walletAddress: wallet.classicAddress || wallet.address,
-  });
-
   // Show loading state on confirm button
   const confirmBtn = document.querySelector('[onclick="confirmSend()"]');
   const originalText = confirmBtn.innerHTML;
@@ -565,7 +554,7 @@ async function confirmSend() {
         ledger_index: "validated",
       });
 
-      console.log("Account info:", accountInfo.result.account_data);
+      
 
       // Check if account has sufficient balance
       const balance = xrpl.dropsToXrp(accountInfo.result.account_data.Balance);
@@ -602,7 +591,7 @@ async function confirmSend() {
     });
 
     const currentLedger = ledgerInfo.result.ledger_index;
-    console.log("Current ledger sequence:", currentLedger);
+   
 
     const tx = {
       TransactionType: "Payment",
@@ -613,75 +602,22 @@ async function confirmSend() {
     };
 
     const prepared = await client.autofill(tx);
-    console.log("Prepared transaction instructions:", prepared);
-    console.log("Transaction cost:", xrpl.dropsToXrp(prepared.Fee), "XRP");
-    console.log("LastLedgerSequence:", prepared.LastLedgerSequence);
-    console.log("About to sign transaction...");
+  
 
     let signed;
     try {
-      // Handle different wallet types for signing
-      if (wallet.sign && typeof wallet.sign === "function") {
-        // Standard XRPL Wallet object (from seed)
-        console.log("Signing with standard XRPL Wallet object");
-        signed = wallet.sign(prepared);
-        console.log("Transaction signed with XRPL Wallet");
-      } else if (wallet.privateKey) {
-        // Custom wallet object (from hex or WIF conversion) - create temporary wallet
-        console.log(
-          "Signing with custom wallet object using hex private key:",
-          wallet.privateKey.substring(0, 8) + "..."
-        );
-
-        // For hex private keys, create a temporary XRPL Wallet object for signing
-        try {
-          // Create temporary XRPL Wallet from the private key and public key
-          const tempWallet = new xrpl.Wallet(
-            wallet.publicKey,
-            wallet.privateKey
-          );
-          signed = tempWallet.sign(prepared);
-          console.log(
-            "Transaction signed with temporary XRPL Wallet from hex private key"
-          );
-        } catch (walletError) {
-          console.log(
-            "Direct wallet creation failed, trying alternative method...",
-            walletError.message
-          );
-          // Alternative: Use xrpl.Wallet.fromSecret if we have seed
-          if (wallet.seed && wallet.seed.startsWith("s")) {
-            const seedWallet = xrpl.Wallet.fromSeed(wallet.seed);
-            signed = seedWallet.sign(prepared);
-            console.log("Transaction signed with seed-based wallet");
-          } else {
-            // Last resort: Create wallet from entropy derived from private key
-            const privateKeyBytes = new Uint8Array(
-              wallet.privateKey.match(/.{2}/g).map((byte) => parseInt(byte, 16))
-            );
-            const entropyWallet = xrpl.Wallet.fromEntropy(privateKeyBytes);
-            signed = entropyWallet.sign(prepared);
-            console.log("Transaction signed with entropy-based wallet");
-          }
-        }
+      if (wallet.seed && wallet.seed.startsWith("s")) {
+        const seedWallet = xrpl.Wallet.fromSeed(wallet.seed);
+        signed = seedWallet.sign(prepared);
       } else {
         throw new Error("Invalid wallet object - no signing method available");
       }
-
-      console.log("Transaction signed successfully!");
-      console.log("Identifying hash:", signed.hash);
-      console.log("Signed blob:", signed.tx_blob);
     } catch (signError) {
       console.error("Error signing transaction:", signError);
       throw new Error(`Failed to sign transaction: ${signError.message}`);
     }
 
     const result = await client.submitAndWait(signed.tx_blob);
-
-    console.log(" TX Hash:", signed.hash);
-    console.log(" From:", wallet.classicAddress || wallet.address);
-    console.log(" To:", destination);
-    console.log(" Amount:", amount, "XRP");
 
     // Safe access to transaction date
     let rippleDate = "N/A";
@@ -693,17 +629,9 @@ async function confirmSend() {
         hour12: true,
       });
     }
-    console.log(" Date:", rippleDate);
 
     const Ledger_Index = result.result.ledger_index || "N/A";
     const fee = xrpl.dropsToXrp(result.result.Fee);
-
-    console.log(" Fee:", fee, "XRP");
-    console.log(" Ledger Index:", Ledger_Index);
-    console.log(
-      " Result:",
-      result.result?.meta?.TransactionResult || "Unknown"
-    );
 
     // Check if transaction was successful
     if (result.result?.meta?.TransactionResult === "tesSUCCESS") {
@@ -804,8 +732,6 @@ async function confirmSend() {
     window.pendingTransaction = null;
   }
 }
-
-
 
 function clearSendForm() {
   const sendKeyField = getRef("sendKey");
@@ -1670,7 +1596,6 @@ async function retrieveXRPAddress() {
           seed: rippleWallet.seed,
         };
       } catch (seedError) {
-        console.log("Not a valid XRP seed, trying as private key...");
         throw new Error("Invalid XRP seed format");
       }
     }
@@ -1925,7 +1850,6 @@ function generateBTCFromPrivateKey(privateKey) {
 function generateFLOFromPrivateKey(privateKey) {
   try {
     let flowif = privateKey;
-    console.log("Input private key:", flowif);
 
     if (/^[0-9a-fA-F]{64}$/.test(privateKey)) {
       flowif = coinjs.privkey2wif(privateKey);
@@ -1937,8 +1861,6 @@ function generateFLOFromPrivateKey(privateKey) {
     if (!floAddress) {
       throw new Error("No working FLO address generation method found");
     }
-    console.log("FLO Address:", floAddress);
-    console.log("FLO Private Key:", floprivateKey);
 
     return {
       address: floAddress,

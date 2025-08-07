@@ -102,7 +102,6 @@ class SearchedAddressDB {
 // Initialize the database
 const searchedAddressDB = new SearchedAddressDB();
 
-// Check if uhtml is available, otherwise use a fallback
 const {
   html,
   svg,
@@ -155,7 +154,7 @@ function getRef(elementId) {
   return element;
 }
 
-// displays a popup for asking permission. Use this instead of JS confirm
+// displays a popup for asking permission.
 const getConfirmation = (title, options = {}) => {
   return new Promise((resolve) => {
     const {
@@ -196,24 +195,20 @@ const debounce = (callback, wait) => {
 };
 
 let zIndex = 50;
-// Note: popupStack is defined in components.min.js, so we don't redeclare it here
 
-// function required for popups or modals to appear
 function openPopup(popupId, pinned) {
   zIndex++;
   const popup = getRef(popupId);
   popup.setAttribute("style", `z-index: ${zIndex}`);
   popup.show({ pinned });
-  // Use the global popupStack from components.min.js
+
   if (typeof popupStack !== "undefined" && popupStack.push) {
     popupStack.push({ popup, id: popupId });
   }
   return popup;
 }
 
-// hides the popup or modal
 function closePopup() {
-  // Use the global popupStack from components.min.js
   if (typeof popupStack !== "undefined" && popupStack.peek && popupStack.pop) {
     if (popupStack.peek() === undefined) return;
     const current = popupStack.pop();
@@ -221,16 +216,11 @@ function closePopup() {
   }
 }
 
-// Alias for compatibility
-function hidePopup() {
-  closePopup();
-}
-
 document.addEventListener("popupclosed", (e) => {
   zIndex--;
 });
 
-//Function for displaying toast notifications. pass in error for mode param if you want to show an error.
+//Function for displaying toast notifications.
 function notify(message, mode, options = {}) {
   let icon;
   switch (mode) {
@@ -554,8 +544,6 @@ async function confirmSend() {
         ledger_index: "validated",
       });
 
-      
-
       // Check if account has sufficient balance
       const balance = xrpl.dropsToXrp(accountInfo.result.account_data.Balance);
       const requiredAmount = parseFloat(amount) + 0.000012; // Add typical fee
@@ -591,7 +579,6 @@ async function confirmSend() {
     });
 
     const currentLedger = ledgerInfo.result.ledger_index;
-   
 
     const tx = {
       TransactionType: "Payment",
@@ -602,7 +589,6 @@ async function confirmSend() {
     };
 
     const prepared = await client.autofill(tx);
-  
 
     let signed;
     try {
@@ -733,94 +719,7 @@ async function confirmSend() {
   }
 }
 
-function clearSendForm() {
-  const sendKeyField = getRef("sendKey");
-  const recipientField = getRef("recipient");
-  const amountField = getRef("amount");
-
-  if (sendKeyField) sendKeyField.value = "";
-  if (recipientField) recipientField.value = "";
-  if (amountField) amountField.value = "";
-
-  notify("Send form cleared", "success");
-}
-
-// Real-time address validation for UI feedback
-function validateAddressInput(address) {
-  if (!address) return { valid: false, message: "" };
-
-  if (!address.startsWith("r")) {
-    return { valid: false, message: "Address must start with 'r'" };
-  }
-
-  if (address.length < 25) {
-    return { valid: false, message: "Address too short" };
-  }
-
-  if (address.length > 34) {
-    return { valid: false, message: "Address too long" };
-  }
-
-  const base58Regex =
-    /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
-  if (!base58Regex.test(address)) {
-    return { valid: false, message: "Invalid characters in address" };
-  }
-
-  // Try XRPL validation if available
-  if (typeof xrpl !== "undefined" && xrpl.isValidClassicAddress) {
-    try {
-      if (!xrpl.isValidClassicAddress(address)) {
-        return { valid: false, message: "Invalid address checksum" };
-      }
-    } catch (e) {
-      return { valid: false, message: "Address validation error" };
-    }
-  }
-
-  return { valid: true, message: "Valid address" };
-}
-
-window.addEventListener("error", function (e) {
-  if (
-    e.message &&
-    (e.message.includes("commitStyles") ||
-      e.message.includes("Animation") ||
-      e.message.includes("components.min.js"))
-  ) {
-    console.warn("Non-critical component error suppressed:", e.message);
-    e.preventDefault();
-    return false;
-  }
-});
-
-// Copy address to clipboard
-function copyAddress() {
-  const addressElement = document.getElementById("checkedAddress");
-  const address = addressElement.textContent;
-
-  if (address && address !== "-") {
-    navigator.clipboard
-      .writeText(address)
-      .then(() => {
-        notify("Address copied to clipboard!", "success");
-      })
-      .catch(() => {
-        // Fallback for older browsers
-        const textArea = document.createElement("textarea");
-        textArea.value = address;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textArea);
-        notify("Address copied to clipboard!", "success");
-      });
-  } else {
-    notify("No address to copy", "error");
-  }
-}
-
-// Check balance for any Ripple address without requiring private key
+// Check balance for any Ripple address
 async function checkBalance() {
   try {
     const addressInput = document.getElementById("checkAddress");
@@ -1811,16 +1710,6 @@ function copyToClipboard(text) {
     });
 }
 
-// Helper function to convert hex to Uint8Array
-function hexToUint8Array(hex) {
-  const cleanHex = hex.replace(/^0x/, "");
-  const result = new Uint8Array(cleanHex.length / 2);
-  for (let i = 0; i < cleanHex.length; i += 2) {
-    result[i / 2] = parseInt(cleanHex.substr(i, 2), 16);
-  }
-  return result;
-}
-
 function generateBTCFromPrivateKey(privateKey) {
   try {
     if (typeof btcOperator === "undefined") {
@@ -1876,12 +1765,9 @@ window.sendXRP = sendXRP;
 
 window.generateXRPAddress = generateXRPAddress;
 window.retrieveXRPAddress = retrieveXRPAddress;
-window.copyAddress = copyAddress;
 window.copyToClipboard = copyToClipboard;
 window.checkBalance = checkBalance;
-window.clearSendForm = clearSendForm;
 window.getRippleAddress = getRippleAddress;
-window.validateAddressInput = validateAddressInput;
 window.confirmSend = confirmSend;
 window.closePopup = closePopup;
 window.lookupTransactions = lookupTransactions;
@@ -1905,7 +1791,6 @@ window.clearAllSearchedAddresses = clearAllSearchedAddresses;
 window.copyAddressToClipboard = copyAddressToClipboard;
 window.recheckBalance = recheckBalance;
 
-// Initialize input controls when DOM is ready
 document.addEventListener("DOMContentLoaded", () => {
   initializeInputControls();
 });

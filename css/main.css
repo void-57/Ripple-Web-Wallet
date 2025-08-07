@@ -1,4 +1,4 @@
-/* CSS Variables */
+
 :root {
   --primary-color: #3b82f6;
   --primary-dark: #2563eb;
@@ -49,7 +49,7 @@
   --border-color: #e5e7eb;
 }
 
-/* Reset and Base Styles */
+
 * {
   margin: 0;
   padding: 0;
@@ -72,7 +72,7 @@ body {
   box-sizing: border-box !important;
 }
 
-/* Ensure body and html have no margins */
+
 html,
 body {
   margin: 0 !important;

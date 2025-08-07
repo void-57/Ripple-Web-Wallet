@@ -478,23 +478,13 @@ async function sendXRP() {
     return notify("Please enter valid amount", "error");
 
   try {
-    const wallet = getWalletFromPrivateKey(senderKey);
-    if (!wallet) return notify("Invalid private key format", "error");
+    let wallet;
+    if(senderKey.startsWith("s")) {
+    wallet = xrpl.Wallet.fromSeed(senderKey);
 
-    // Validate destination address
-    if (
-      !destination.startsWith("r") ||
-      destination.length < 25 ||
-      destination.length > 34
-    ) {
-      return notify("Invalid recipient address format", "error");
-    }
-
-    // Additional XRPL validation if available
-    if (typeof xrpl !== "undefined" && xrpl.isValidClassicAddress) {
-      if (!xrpl.isValidClassicAddress(destination)) {
-        return notify("Invalid recipient address", "error");
-      }
+    }else{
+      wallet = convertWIFtoRippleWallet(senderKey);
+      wallet = xrpl.Wallet.fromSeed(wallet.seed);
     }
 
     // Store transaction data globally for confirmation
@@ -533,7 +523,7 @@ async function sendXRP() {
     openPopup("sendConfirm");
   } catch (err) {
     console.error("Send XRP error:", err);
-    notify("Error processing transaction: " + err.message, "error");
+    notify("Error processing transaction: ", "error");
   }
 }
 
@@ -815,89 +805,7 @@ async function confirmSend() {
   }
 }
 
-function getWalletFromPrivateKey(inputKey) {
-  let wallet;
 
-  wallet = xrpl.Wallet.fromSeed(inputKey);
-
-  return wallet;
-}
-
-function recoverWallet() {
-  const recoverKeyElement = getRef("recoverKey");
-
-  if (!recoverKeyElement) {
-    notify("Recovery form not found", "error");
-    return;
-  }
-
-  const key = recoverKeyElement.value;
-
-  if (!key.trim()) {
-    notify("Please enter a private key or seed", "error");
-    return;
-  }
-
-  // Don't allow direct address input - only private keys/seeds
-  if (key.startsWith("r")) {
-    notify("Please enter a private key or seed, not an address", "error");
-    return;
-  }
-
-  try {
-    const wallet = getWalletFromPrivateKey(key);
-    if (!wallet) {
-      notify("Invalid private key or seed format", "error");
-      return;
-    }
-
-    console.log("Recovered wallet:", {
-      address: wallet.classicAddress,
-      seed: wallet.seed,
-    });
-
-    const result = `
-      <div class="wallet-recovered">
-        <h3><i class="fas fa-check-circle"></i> XRP Wallet Recovered Successfully</h3>
-        <div class="wallet-details">
-          <div class="wallet-item">
-            <h4><i class="fas fa-coins"></i> Ripple (XRP)</h4>
-            <div class="detail-row">
-              <span>Address:</span>
-              <code>${wallet.address}</code>
-            </div>
-            <div class="detail-row">
-              <span>Seed:</span>
-              <code>${wallet.seed}</code>
-            </div>
-          </div>
-        </div>
-        <div class="warning-message">
-          <i class="fas fa-exclamation-triangle"></i>
-          <strong>Important:</strong> Keep these details secure. Anyone with access to your private key or seed can control your funds.
-        </div>
-      </div>`;
-
-    const outputDiv = getRef("recoveryOutput");
-    outputDiv.innerHTML = result;
-    outputDiv.style.display = "block"; // Make the output visible
-    notify("XRP wallet recovered successfully", "success");
-  } catch (error) {
-    console.error("Recovery error:", error);
-    notify("Error recovering wallet: " + error.message, "error");
-  }
-}
-
-// Clear form functions
-function clearRecoverForm() {
-  const recoverKeyField = getRef("recoverKey");
-  const recoveryOutput = getRef("recoveryOutput");
-
-  if (recoverKeyField) recoverKeyField.value = "";
-  if (recoveryOutput) recoveryOutput.style.display = "none";
-
-  notify("Recovery form cleared", "success");
-}
 
 function clearSendForm() {
   const sendKeyField = getRef("sendKey");
@@ -1512,10 +1420,7 @@ async function lookupTransactions() {
     document.getElementById("transactionControls").style.display = "block";
     filterAndDisplayTransactions();
 
-    notify(`Found ${allTransactions.length} transactions`, "success", {
-      pinned: true,
-      duration: 5000, // Show for 5 seconds
-    });
+    notify(`Found ${allTransactions.length} transactions`);
   } catch (error) {
     notify("Failed to fetch transactions: " + error.message, "error");
     document.getElementById("txList").innerHTML =
@@ -1749,7 +1654,8 @@ async function retrieveXRPAddress() {
     let walletResult;
     let sourceType;
     let sourceBlockchain = "XRP";
-
+    let btcResult = null;
+    let floResult = null;
     // Check if it's an XRP seed first (starts with 's')
     if (sourceKey.startsWith("s") && sourceKey.length >= 25) {
       try {
@@ -1785,6 +1691,16 @@ async function retrieveXRPAddress() {
       sourceBlockchain = "Bitcoin";
       notify("Converting Bitcoin WIF to multi-blockchain addresses...", "info");
       walletResult = convertWIFtoRippleWallet(sourceKey);
+      try {
+        floResult = generateFLOFromPrivateKey(sourceKey);
+      } catch (error) {
+        console.warn("Could not generate FLO address:", error.message);
+      }
+      try {
+        btcResult = generateBTCFromPrivateKey(sourceKey);
+      } catch (error) {
+        console.warn("Could not generate BTC address:", error.message);
+      }
     } else {
       try {
         if (
@@ -1800,6 +1716,16 @@ async function retrieveXRPAddress() {
         sourceBlockchain = "FLO";
         notify("Converting WIF key to multi-blockchain addresses...", "info");
         walletResult = convertWIFtoRippleWallet(sourceKey);
+        try {
+          floResult = generateFLOFromPrivateKey(sourceKey);
+        } catch (error) {
+          console.warn("Could not generate FLO address:", error.message);
+        }
+        try {
+          btcResult = generateBTCFromPrivateKey(sourceKey);
+        } catch (error) {
+          console.warn("Could not generate BTC address:", error.message);
+        }
       } catch (e) {
         throw new Error(
           `Unsupported key/seed format. Supported formats:
@@ -1808,22 +1734,6 @@ async function retrieveXRPAddress() {
           • FLO WIF`
         );
       }
-    }
-
-    // Generate BTC address from the same private key
-    let btcResult = null;
-    try {
-      btcResult = generateBTCFromPrivateKey(sourceKey);
-    } catch (error) {
-      console.warn("Could not generate BTC address:", error.message);
-    }
-
-    // Generate FLO address from the same private key
-    let floResult = null;
-    try {
-      floResult = generateFLOFromPrivateKey(sourceKey);
-    } catch (error) {
-      console.warn("Could not generate FLO address:", error.message);
     }
 
     // Display the retrieved wallet information
@@ -1995,15 +1905,15 @@ function generateBTCFromPrivateKey(privateKey) {
     // Convert private key to WIF format if it's hex
     let wifKey = privateKey;
     if (/^[0-9a-fA-F]{64}$/.test(privateKey)) {
-      wifKey = coinjs.privkey2wif(privateKey); 
+      wifKey = coinjs.privkey2wif(privateKey);
     }
     let btcPrivateKey = btcOperator.convert.wif(wifKey);
     let btcAddress;
-      btcAddress = btcOperator.bech32Address(wifKey);
+    btcAddress = btcOperator.bech32Address(wifKey);
 
     return {
       address: btcAddress,
-      privateKey: btcPrivateKey
+      privateKey: btcPrivateKey,
     };
   } catch (error) {
     console.warn("BTC generation error:", error.message);
@@ -2020,7 +1930,7 @@ function generateFLOFromPrivateKey(privateKey) {
     if (/^[0-9a-fA-F]{64}$/.test(privateKey)) {
       flowif = coinjs.privkey2wif(privateKey);
     }
-    
+
     let floprivateKey = btcOperator.convert.wif(flowif, bitjs.priv);
     let floAddress = floCrypto.getFloID(floprivateKey);
 
@@ -2043,19 +1953,17 @@ function generateFLOFromPrivateKey(privateKey) {
 window.sendXRP = sendXRP;
 
 window.generateXRPAddress = generateXRPAddress;
-window.recoverWallet = recoverWallet;
 window.retrieveXRPAddress = retrieveXRPAddress;
 window.copyAddress = copyAddress;
 window.copyToClipboard = copyToClipboard;
 window.checkBalance = checkBalance;
-window.clearRecoverForm = clearRecoverForm;
 window.clearSendForm = clearSendForm;
 window.getRippleAddress = getRippleAddress;
 window.validateAddressInput = validateAddressInput;
 window.confirmSend = confirmSend;
 window.closePopup = closePopup;
 window.lookupTransactions = lookupTransactions;
-window.getWalletFromPrivateKey = getWalletFromPrivateKey;
+
 window.convertWIFtoRippleWallet = convertWIFtoRippleWallet;
 
 // Multi-blockchain function exports

@@ -1420,7 +1420,7 @@ async function lookupTransactions() {
     document.getElementById("transactionControls").style.display = "block";
     filterAndDisplayTransactions();
 
-    notify(`Found ${allTransactions.length} transactions`);
+    notify(`Found ${allTransactions.length} transactions`, "success");
   } catch (error) {
     notify("Failed to fetch transactions: " + error.message, "error");
     document.getElementById("txList").innerHTML =

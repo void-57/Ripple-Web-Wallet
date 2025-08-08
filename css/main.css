@@ -2051,7 +2051,7 @@ sm-popup::part(popup) {
   height: 4px;
   width: 100%;
   background: rgba(0, 0, 0, 0.15);
-  animation: countdown 5s linear forwards;
+  animation: countdown 3s linear forwards;
   border-radius: 0 0 0.5rem 0.5rem;
 }
 

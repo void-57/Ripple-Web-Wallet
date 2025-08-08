@@ -1995,46 +1995,94 @@ sm-popup::part(popup) {
   }
 }
 
-/* Notification System - Opaque Backgrounds */
-sm-notifications {
-  position: fixed !important;
-  top: 1rem !important;
-  right: 1rem !important;
-  z-index: 99999 !important;
-  max-width: 320px !important;
-  pointer-events: auto !important;
+/* Notification container */
+.notification-drawer {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: auto;
 }
 
-sm-notifications .notification {
-  background: var(--surface-color) !important;
-  background-color: var(--surface-color) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: var(--border-radius) !important;
-  box-shadow: var(--shadow-lg) !important;
-  margin-bottom: 0.5rem !important;
-  padding: 1rem !important;
-  color: var(--text-primary) !important;
-  opacity: 1 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+/* Notification box */
+.notification {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  background-color: var(--surface-color, #fff);
+  color: var(--text-primary, #000);
+  box-shadow: var(--shadow-md);
+  min-width: 250px;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-/* Status indicators */
-sm-notifications .notification.success {
-  border-left: 4px solid var(--success-color) !important;
+/* Full width and centered on mobile */
+@media (max-width: 600px) {
+  .notification-drawer {
+    left: 0;
+    right: 0;
+    transform: none;
+    align-items: stretch;
+    padding: 0 1rem;
+  }
+
+  .notification {
+    width: 100%;
+    border-radius: 0.5rem;
+  }
 }
 
-sm-notifications .notification.error {
-  border-left: 4px solid var(--danger-color) !important;
+/* Progress bar at bottom */
+.notification::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.15);
+  animation: countdown 5s linear forwards;
+  border-radius: 0 0 0.5rem 0.5rem;
 }
 
-sm-notifications .notification.warning {
-  border-left: 4px solid var(--warning-color) !important;
+@keyframes countdown {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
 }
 
-sm-notifications .notification.info {
-  border-left: 4px solid var(--primary-color) !important;
+/* Mode-specific colors */
+.notification.success {
+  background-color: var(--success-color, #10b981);
+  color: white;
 }
+
+.notification.error {
+  background-color: var(--danger-color, #ef4444);
+  color: white;
+}
+
+.notification svg {
+  flex-shrink: 0;
+  width: 1.2rem;
+  height: 1.2rem;
+  fill: currentColor;
+}
+
+
 
 /* Animation */
 @keyframes slideInRight {
@@ -2059,42 +2107,7 @@ sm-notifications .notification.info {
   }
 }
 
-sm-notifications .notification {
-  animation: slideInRight 0.3s ease-out !important;
-}
 
-sm-notifications .notification.removing {
-  animation: slideOutRight 0.3s ease-in !important;
-}
-
-/* Remove all transparency overrides */
-body sm-notifications,
-body sm-notifications *,
-sm-notifications .notification {
-  background: var(--surface-color) !important;
-  background-color: var(--surface-color) !important;
-  opacity: 1 !important;
-  --sm-notification-opacity: 1 !important;
-  --notification-opacity: 1 !important;
-}
-
-[data-theme="dark"] sm-notifications .notification {
-  background: var(--surface-color) !important;
-  background-color: var(--surface-color) !important;
-  color: var(--text-primary) !important;
-}
-
-/* Light theme notifications */
-[data-theme="light"] sm-notifications .notification {
-  background: var(--surface-color) !important;
-  background-color: var(--surface-color) !important;
-  color: #1f2937 !important;
-}
-
-/* Default light mode (when no theme is explicitly set) */
-body:not([data-theme="dark"]) sm-notifications .notification {
-  color: #1f2937 !important;
-}
 
 /* Generate and Retrieve Actions */
 .generate-actions,
@@ -2307,3 +2320,4 @@ body:not([data-theme="dark"]) sm-notifications .notification {
     width: auto;
   }
 }
+

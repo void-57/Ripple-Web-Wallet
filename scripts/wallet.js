@@ -285,7 +285,6 @@ function initializeInputControls() {
     "amount", // Send page - amount
     "recoverKey", // Retrieve page
     "checkAddress", // Balance check
-    "lookupAddress", // Transaction lookup
     "generateKey", // Generate page
   ];
 
@@ -630,21 +629,52 @@ async function confirmSend() {
     if (result.result?.meta?.TransactionResult === "tesSUCCESS") {
       const fee = xrpl.dropsToXrp(result.result.Fee);
 
-      // Show detailed success notification
-      const successMessage = `
-        <div style="font-weight: 600; margin-bottom: 0.5rem;">
-          <i class="fas fa-check-circle" style="color: var(--success-color); margin-right: 0.5rem;"></i>
-          Transaction Successful!
-        </div>
-        <div style="font-size: 0.875rem; line-height: 1.5;">
-          <div><strong>Amount:</strong> ${amount} XRP</div>
-          <div><strong>Fee:</strong> ${fee} XRP</div>  
-          <div><strong>To:</strong> ${destination}</div>
-          <div><strong>Hash:</strong> <span style="word-break: break-all;">${signed.hash}</span></div>
-        </div>
-      `;
+      // Close the confirmation popup first
+      closePopup();
 
-      notify(successMessage, "success", { timeout: 8000 });
+      // Populate detailed success popup
+      const successDetailsContainer = getRef("successTransactionDetails");
+      if (successDetailsContainer) {
+        successDetailsContainer.innerHTML = `
+          <div class="detail-row">
+            <span class="detail-label">Status:</span>
+            <span class="detail-value" style="color: var(--success-color); font-weight: bold;">✅ Confirmed</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Amount Sent:</span>
+            <span class="detail-value">${amount} XRP</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Network Fee:</span>
+            <span class="detail-value">${fee} XRP</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">From:</span>
+            <span class="detail-value">${
+              wallet.classicAddress || wallet.address
+            }</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">To:</span>
+            <span class="detail-value">${destination}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Transaction Hash:</span>
+            <span class="detail-value">${signed.hash}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Ledger Index:</span>
+            <span class="detail-value">${Ledger_Index}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Transaction Date:</span>
+            <span class="detail-value">${rippleDate}</span>
+          </div>
+        `;
+      }
+
+      // Show success popup
+      openPopup("transactionSuccess");
 
       // Clear form safely
       const sendKeyElement = getRef("sendKey");
@@ -714,6 +744,9 @@ async function confirmSend() {
       <div style="font-size: 0.875rem;">${errorMessage}</div>
     `;
     notify(formattedError, "error", { timeout: 8000 });
+
+    // Close the confirmation popup on error
+    closePopup();
   } finally {
     await client.disconnect();
 
@@ -721,118 +754,8 @@ async function confirmSend() {
     confirmBtn.innerHTML = originalText;
     confirmBtn.disabled = false;
 
-    hidePopup();
+    // Don't close popup here - it's handled in success/error cases
     window.pendingTransaction = null;
-  }
-}
-
-// Check balance for any Ripple address
-async function checkBalance() {
-  try {
-    const addressInput = document.getElementById("checkAddress");
-    const address = addressInput.value.trim();
-
-    if (!address) {
-      notify("Please enter a Ripple address", "error");
-      return;
-    }
-
-    // Validate Ripple address format
-    if (
-      !address.startsWith("r") ||
-      address.length < 25 ||
-      address.length > 34
-    ) {
-      notify("Invalid Ripple address format", "error");
-      return;
-    }
-
-    // Show loading state
-    const checkBtn = document.querySelector('[onclick="checkBalance()"]');
-    const originalText = checkBtn.innerHTML;
-    checkBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
-    checkBtn.disabled = true;
-
-    // Create XRPL client instance
-    const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
-
-    try {
-      await client.connect();
-
-      // Get account info
-      try {
-        const accountInfo = await client.request({
-          command: "account_info",
-          account: address,
-          ledger_index: "current",
-        });
-
-        const balance =
-          parseFloat(accountInfo.result.account_data.Balance) / 1000000; // Convert drops to XRP
-        const reserve =
-          parseFloat(accountInfo.result.account_data.OwnerCount || 0) * 2 + 10; // Base reserve + owner reserve
-
-        // Update balance display
-        document.getElementById(
-          "displayBalance"
-        ).textContent = `${balance.toLocaleString()} XRP`;
-        document.getElementById("checkedAddress").textContent = address;
-
-        // Save to IndexedDB
-        try {
-          await searchedAddressDB.saveSearchedAddress(
-            address,
-            balance.toLocaleString()
-          );
-          await updateSearchedAddressesList();
-        } catch (dbError) {
-          console.warn("Failed to save address to IndexedDB:", dbError);
-        }
-
-        // Show balance info
-        document.getElementById("balanceInfo").style.display = "block";
-
-        notify(`Balance: ${balance.toLocaleString()} XRP`, "success");
-      } catch (error) {
-        if (error.data && error.data.error === "actNotFound") {
-          // Account not found (not activated)
-          document.getElementById("displayBalance").textContent = "0 XRP";
-          document.getElementById("checkedAddress").textContent = address;
-
-          // Save to IndexedDB
-          try {
-            await searchedAddressDB.saveSearchedAddress(address, "0");
-            await updateSearchedAddressesList();
-          } catch (dbError) {
-            console.warn("Failed to save address to IndexedDB:", dbError);
-          }
-
-          // Show balance info
-          document.getElementById("balanceInfo").style.display = "block";
-
-          notify(
-            "Account not found - Address not activated (needs 10 XRP minimum)",
-            "warning"
-          );
-        } else {
-          throw error;
-        }
-      }
-    } finally {
-      await client.disconnect();
-      // Restore button state
-      checkBtn.innerHTML = originalText;
-      checkBtn.disabled = false;
-    }
-  } catch (error) {
-    console.error("Error checking balance:", error);
-    notify(`Error checking balance: ${error.message}`, "error");
-    // Restore button state on error
-    const checkBtn = document.querySelector('[onclick="checkBalance()"]');
-    if (checkBtn) {
-      checkBtn.innerHTML = '<i class="fas fa-search-dollar"></i> Check Balance';
-      checkBtn.disabled = false;
-    }
   }
 }
 
@@ -936,7 +859,7 @@ async function copyAddressToClipboard(address) {
 
 async function recheckBalance(address) {
   document.getElementById("checkAddress").value = address;
-  await checkBalance();
+  await checkBalanceAndTransactions();
 }
 
 // Transaction pagination and filtering
@@ -963,7 +886,20 @@ function setTransactionFilter(filter) {
 }
 
 function filterAndDisplayTransactions() {
-  const address = document.getElementById("lookupAddress").value.trim();
+  // Try to get address from either input field (for compatibility)
+  let address = "";
+
+  const checkInput = document.getElementById("checkAddress");
+
+  if (checkInput && checkInput.value.trim()) {
+    address = checkInput.value.trim();
+  } else {
+    // If no address is available, we can't filter properly
+    filteredTransactions = [...allTransactions];
+    displayTransactionsPage();
+    updatePaginationControls();
+    return;
+  }
 
   // Filter transactions based on current filter
   switch (currentFilter) {
@@ -991,7 +927,7 @@ function displayTransactionsPage() {
   const pageTransactions = filteredTransactions.slice(startIndex, endIndex);
 
   const txList = document.getElementById("txList");
-  const address = document.getElementById("lookupAddress").value.trim();
+  const address = document.getElementById("checkAddress").value.trim();
 
   if (pageTransactions.length === 0) {
     if (filteredTransactions.length === 0 && allTransactions.length > 0) {
@@ -1199,69 +1135,171 @@ function goToNextPage() {
   }
 }
 
-async function lookupTransactions() {
-  const address = document.getElementById("lookupAddress").value.trim();
-  if (!address) {
-    notify("Please enter an address to lookup.", "error");
-    return;
-  }
-
-  // Show loading state
-  const lookupBtn = document.querySelector('[onclick="lookupTransactions()"]');
-  const originalText = lookupBtn.innerHTML;
-  lookupBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-  lookupBtn.disabled = true;
-
-  // Hide controls initially
-  document.getElementById("transactionControls").style.display = "none";
-
-  const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
+//combines balance checking and transaction lookup
+async function checkBalanceAndTransactions() {
+  const addressInput = document.getElementById("checkAddress");
+  const address = addressInput.value.trim();
   try {
-    await client.connect();
-    const res = await client.request({
-      command: "account_tx",
-      account: address,
-      ledger_index_min: -1,
-      ledger_index_max: -1,
-      limit: 1000,
-    });
-
-    // Store all transactions
-    allTransactions = res.result.transactions;
-
-    // Reset pagination state
-    currentPage = 1;
-    currentFilter = "all";
-
-    // Reset filter buttons
-    document.querySelectorAll(".filter-btn").forEach((btn) => {
-      btn.classList.remove("active");
-      if (btn.dataset.filter === "all") {
-        btn.classList.add("active");
-      }
-    });
-
-    if (allTransactions.length === 0) {
-      document.getElementById("txList").innerHTML =
-        '<div class="no-transactions"><i class="fas fa-inbox"></i><p>No transactions found for this address.</p></div>';
-      notify("No transactions found.", "error");
+    if (!address) {
+      notify("Please enter a Ripple address", "error");
       return;
     }
 
-    // Show controls and display transactions
-    document.getElementById("transactionControls").style.display = "block";
-    filterAndDisplayTransactions();
+    // Validate Ripple address format
+    if (
+      !address.startsWith("r") ||
+      address.length < 25 ||
+      address.length > 34
+    ) {
+      notify("Invalid Ripple address format", "error");
+      return;
+    }
 
-    notify(`Found ${allTransactions.length} transactions`, "success");
+    // Show loading state
+    const checkBtn = document.querySelector(
+      '[onclick="checkBalanceAndTransactions()"]'
+    );
+    const originalText = checkBtn.innerHTML;
+    checkBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+    checkBtn.disabled = true;
+
+    // Create XRPL client instance
+    const client = new xrpl.Client("wss://s.altnet.rippletest.net:51233");
+
+    try {
+      await client.connect();
+
+      // First, check balance
+      try {
+        const accountInfo = await client.request({
+          command: "account_info",
+          account: address,
+          ledger_index: "current",
+        });
+
+        const balance =
+          parseFloat(accountInfo.result.account_data.Balance) / 1000000; // Convert drops to XRP
+
+        // Update balance display
+        document.getElementById(
+          "displayBalance"
+        ).textContent = `${balance.toLocaleString()} XRP`;
+        document.getElementById("checkedAddress").textContent = address;
+
+        // Save to IndexedDB
+        try {
+          await searchedAddressDB.saveSearchedAddress(
+            address,
+            balance.toLocaleString()
+          );
+          await updateSearchedAddressesList();
+        } catch (dbError) {
+          console.warn("Failed to save address to IndexedDB:", dbError);
+        }
+
+        // Show balance info
+        document.getElementById("balanceInfo").style.display = "block";
+      } catch (error) {
+        if (error.data && error.data.error === "actNotFound") {
+          // Account not found (not activated)
+          document.getElementById("displayBalance").textContent = "0 XRP";
+          document.getElementById("checkedAddress").textContent = address;
+
+          // Save to IndexedDB
+          try {
+            await searchedAddressDB.saveSearchedAddress(address, "0");
+            await updateSearchedAddressesList();
+          } catch (dbError) {
+            console.warn("Failed to save address to IndexedDB:", dbError);
+          }
+
+          // Show balance info
+          document.getElementById("balanceInfo").style.display = "block";
+
+          notify(
+            "Account not found - Address not activated (needs 10 XRP minimum)",
+            "warning"
+          );
+        } else {
+          throw error;
+        }
+      }
+
+      // Now lookup transactions
+      try {
+        const res = await client.request({
+          command: "account_tx",
+          account: address,
+          ledger_index_min: -1,
+          ledger_index_max: -1,
+          limit: 1000,
+        });
+
+        // Store all transactions
+        allTransactions = res.result.transactions;
+
+        // Reset pagination state
+        currentPage = 1;
+        currentFilter = "all";
+
+        // Reset filter buttons
+        document.querySelectorAll(".filter-btn").forEach((btn) => {
+          btn.classList.remove("active");
+          if (btn.dataset.filter === "all") {
+            btn.classList.add("active");
+          }
+        });
+
+        if (allTransactions.length === 0) {
+          document.getElementById("txList").innerHTML =
+            '<div class="no-transactions"><i class="fas fa-inbox"></i><p>No transactions found for this address.</p></div>';
+        } else {
+          // Show controls and display transactions
+          document.getElementById("transactionControls").style.display =
+            "block";
+          filterAndDisplayTransactions();
+        }
+
+        // Set the transaction lookup address field value for filtering compatibility
+        const lookupInput = document.getElementById("checkAddress");
+        if (lookupInput) {
+          lookupInput.value = address;
+        }
+
+        // Show transaction section
+        document.getElementById("transactionSection").style.display = "block";
+
+        notify(
+          `Balance loaded. Found ${allTransactions.length} transactions`,
+          "success"
+        );
+      } catch (transactionError) {
+        console.warn("Failed to fetch transactions:", transactionError);
+        document.getElementById("txList").innerHTML =
+          '<div class="error-state"><i class="fas fa-exclamation-triangle"></i><p>Failed to load transactions.</p></div>';
+
+        // Still show transaction section even if transactions failed
+        document.getElementById("transactionSection").style.display = "block";
+
+        notify("Balance loaded, but failed to fetch transactions", "warning");
+      }
+    } finally {
+      await client.disconnect();
+      // Restore button state
+      checkBtn.innerHTML = originalText;
+      checkBtn.disabled = false;
+    }
   } catch (error) {
-    notify("Failed to fetch transactions: " + error.message, "error");
-    document.getElementById("txList").innerHTML =
-      '<div class="error-state"><i class="fas fa-exclamation-triangle"></i><p>Failed to load transactions. Please try again.</p></div>';
-  } finally {
-    await client.disconnect();
-    // Restore button state
-    lookupBtn.innerHTML = originalText;
-    lookupBtn.disabled = false;
+    console.error("Error in checkBalanceAndTransactions:", error);
+    notify(`Error: ${error.message}`, "error");
+    // Restore button state on error
+    const checkBtn = document.querySelector(
+      '[onclick="checkBalanceAndTransactions()"]'
+    );
+    if (checkBtn) {
+      checkBtn.innerHTML = '<i class="fas fa-search-dollar"></i> Check Balance';
+      checkBtn.disabled = false;
+    }
   }
 }
 
@@ -1773,11 +1811,10 @@ window.sendXRP = sendXRP;
 window.generateXRPAddress = generateXRPAddress;
 window.retrieveXRPAddress = retrieveXRPAddress;
 window.copyToClipboard = copyToClipboard;
-window.checkBalance = checkBalance;
 window.getRippleAddress = getRippleAddress;
 window.confirmSend = confirmSend;
 window.closePopup = closePopup;
-window.lookupTransactions = lookupTransactions;
+window.checkBalanceAndTransactions = checkBalanceAndTransactions;
 
 window.convertWIFtoRippleWallet = convertWIFtoRippleWallet;
 

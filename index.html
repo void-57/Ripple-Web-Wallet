@@ -65,17 +65,12 @@
               onclick="showPage('connectPage')"
               class="nav-link active"
             >
-              <i class="fas fa-search-dollar"></i> Check Balance
+              <i class="fas fa-search-dollar"></i>  Transactions
             </a>
           </li>
           <li>
             <a href="#" onclick="showPage('sendPage')" class="nav-link">
               <i class="fas fa-paper-plane"></i> Send XRP
-            </a>
-          </li>
-          <li>
-            <a href="#" onclick="showPage('lookupPage')" class="nav-link">
-              <i class="fas fa-search"></i> Transaction Lookup
             </a>
           </li>
           <li>
@@ -93,11 +88,14 @@
 
       <!-- Main Content Area -->
       <main class="main-content">
-        <!-- Check Balance Page -->
+        <!-- Check Balance & Transactions Page -->
         <div id="connectPage" class="page">
           <div class="page-header">
             <h2><i class="fas fa-search-dollar"></i> Check Balance</h2>
-            <p>Check the XRP balance for any Ripple address</p>
+            <p>
+              Check the XRP balance and transaction history for any Ripple
+              address
+            </p>
           </div>
 
           <div class="card">
@@ -109,16 +107,19 @@
                 type="text"
                 id="checkAddress"
                 class="form-input"
-                placeholder="Enter Ripple address (r...)                                             "
+                placeholder="Enter Ripple address (r...)"
                 autocomplete="off"
               />
               <div class="input-help">
-                Enter any Ripple address to check its XRP balance and account
-                details
+                Enter any Ripple address to check its XRP balance and
+                transaction history
               </div>
             </div>
 
-            <button onclick="checkBalance()" class="btn btn-primary btn-block">
+            <button
+              onclick="checkBalanceAndTransactions()"
+              class="btn btn-primary btn-block"
+            >
               <i class="fas fa-search-dollar"></i> Check Balance
             </button>
           </div>
@@ -137,13 +138,83 @@
                 <div class="address-container">
                   <span id="checkedAddress" class="address-text">-</span>
                   <button
-                    onclick="copyAddressToClipboard()"
+                    onclick="copyAddressToClipboard(document.getElementById('checkedAddress').textContent)"
                     class="btn-icon"
                     title="Copy Address"
                   >
                     <i class="fas fa-copy"></i>
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transaction Section -->
+          <div
+            id="transactionSection"
+            class="card transaction-section"
+            style="display: none"
+          >
+            <!-- Transaction Header and Filter Controls -->
+            <div id="transactionControls" class="transaction-controls">
+              <div class="transaction-header">
+                <h3>Transactions</h3>
+                <div class="filter-buttons">
+                  <button
+                    class="filter-btn active"
+                    data-filter="all"
+                    onclick="setTransactionFilter('all')"
+                  >
+                    <i class="fas fa-list"></i> All
+                  </button>
+                  <button
+                    class="filter-btn"
+                    data-filter="received"
+                    onclick="setTransactionFilter('received')"
+                  >
+                    <i class="fas fa-arrow-down"></i> Received
+                  </button>
+                  <button
+                    class="filter-btn"
+                    data-filter="sent"
+                    onclick="setTransactionFilter('sent')"
+                  >
+                    <i class="fas fa-arrow-up"></i> Sent
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Transaction Results -->
+            <div id="txList" class="transaction-list">
+              <!-- Transaction cards will be inserted here -->
+            </div>
+
+            <!-- Pagination Controls (moved below transaction list) -->
+            <div class="pagination-section">
+              <div class="pagination-info" id="paginationInfo">
+                Showing 0 - 0 of 0 transactions
+              </div>
+              <div class="pagination-controls">
+                <button
+                  class="pagination-btn"
+                  id="prevBtn"
+                  onclick="goToPreviousPage()"
+                  disabled
+                >
+                  <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="page-numbers" id="pageNumbers">
+                  <!-- Page numbers will be inserted here -->
+                </div>
+                <button
+                  class="pagination-btn"
+                  id="nextBtn"
+                  onclick="goToNextPage()"
+                  disabled
+                >
+                  <i class="fas fa-chevron-right"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -159,7 +230,8 @@
           <div class="card">
             <div class="form-group">
               <label for="sendKey">
-                <i class="fas fa-key"></i> Your Ripple Seed or Private Key (FLO/BTC)
+                <i class="fas fa-key"></i> Your Ripple Seed or Private Key
+                (FLO/BTC)
               </label>
               <input
                 type="password"
@@ -205,104 +277,6 @@
             <button onclick="sendXRP()" class="btn btn-primary btn-block">
               <i class="fas fa-paper-plane"></i> Send XRP
             </button>
-          </div>
-        </div>
-
-        <!-- Transaction Lookup Page -->
-        <div id="lookupPage" class="page hidden">
-          <div class="page-header">
-            <h2><i class="fas fa-search"></i> Transaction Lookup</h2>
-            <p>Search transaction history for any Ripple address</p>
-          </div>
-
-          <div class="card">
-            <div class="form-group">
-              <label for="lookupAddress">
-                <i class="fas fa-search"></i> Ripple Address
-              </label>
-              <input
-                type="text"
-                id="lookupAddress"
-                class="form-input"
-                placeholder="Enter Ripple address (r...)"
-                autocomplete="off"
-              />
-              <div class="input-help">
-                Enter any Ripple address to search its transaction history
-              </div>
-            </div>
-
-            <button
-              onclick="lookupTransactions()"
-              class="btn btn-primary btn-block"
-            >
-              <i class="fas fa-search"></i> Search
-            </button>
-          </div>
-
-          <!-- Transaction Filter and Pagination Controls -->
-          <div
-            id="transactionControls"
-            class="transaction-controls"
-            style="display: none"
-          >
-            <div class="filter-section">
-              <div class="filter-buttons">
-                <button
-                  class="filter-btn active"
-                  data-filter="all"
-                  onclick="setTransactionFilter('all')"
-                >
-                  <i class="fas fa-list"></i> All
-                </button>
-                <button
-                  class="filter-btn"
-                  data-filter="received"
-                  onclick="setTransactionFilter('received')"
-                >
-                  <i class="fas fa-arrow-down"></i> Received
-                </button>
-                <button
-                  class="filter-btn"
-                  data-filter="sent"
-                  onclick="setTransactionFilter('sent')"
-                >
-                  <i class="fas fa-arrow-up"></i> Sent
-                </button>
-              </div>
-            </div>
-
-            <div class="pagination-section">
-              <div class="pagination-info" id="paginationInfo">
-                Showing 0 - 0 of 0 transactions
-              </div>
-              <div class="pagination-controls">
-                <button
-                  class="pagination-btn"
-                  id="prevBtn"
-                  onclick="goToPreviousPage()"
-                  disabled
-                >
-                  <i class="fas fa-chevron-left"></i>
-                </button>
-                <div class="page-numbers" id="pageNumbers">
-                  <!-- Page numbers will be inserted here -->
-                </div>
-                <button
-                  class="pagination-btn"
-                  id="nextBtn"
-                  onclick="goToNextPage()"
-                  disabled
-                >
-                  <i class="fas fa-chevron-right"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Transaction Results -->
-          <div id="txList" class="transaction-list">
-            <!-- Transaction cards will be inserted here -->
           </div>
         </div>
 
@@ -446,14 +420,6 @@
         <span>Send</span>
       </button>
       <button
-        onclick="showPage('lookupPage')"
-        class="nav-btn"
-        data-page="lookupPage"
-      >
-        <i class="fas fa-search"></i>
-        <span>Lookup</span>
-      </button>
-      <button
         onclick="showPage('generatePage')"
         class="nav-btn"
         data-page="generatePage"
@@ -489,8 +455,22 @@
       </div>
     </sm-popup>
 
+    <!-- Transaction Success Popup -->
+    <sm-popup id="transactionSuccess">
+      <div class="popup-content">
+        <h3><i class="fas fa-check-circle"></i> Transaction Successful!</h3>
+        <div class="transaction-details" id="successTransactionDetails">
+          <!-- Success transaction details will be populated here -->
+        </div>
+        <div class="popup-actions">
+          <button onclick="closePopup()" class="btn btn-primary">
+            <i class="fas fa-check"></i> Close
+          </button>
+        </div>
+      </div>
+    </sm-popup>
+
     <!-- Standard UI Notifications -->
-    
 
     <!-- Confirmation Popup -->
     <sm-popup id="confirmation_popup">
@@ -509,7 +489,7 @@
     <script src="scripts/btcwallet_scripts_lib.js"></script>
     <script type="text/javascript" src="scripts/floCrypto.js"></script>
     <script type="text/javascript" src="scripts/btcOperator.js"></script>
-    
+
     <script type="module" src="scripts/wallet.js"></script>
     <script>
       // UI Enhancement Functions
@@ -624,6 +604,5 @@
       });
     </script>
     <div id="notification_drawer" class="notification-drawer"></div>
-
   </body>
 </html>

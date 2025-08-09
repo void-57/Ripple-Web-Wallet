@@ -181,6 +181,40 @@ body {
   font-size: 1.5rem;
 }
 
+/* App Brand Styling */
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.app-brand .icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  fill: var(--primary-color);
+  flex-shrink: 0;
+}
+
+.app-name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.app-name__company {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.app-name__title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
 .wallet-balance {
   background: linear-gradient(
     135deg,
@@ -346,7 +380,7 @@ body {
 .main-content {
   flex: 1;
   padding: 2rem;
-  padding-bottom: 140px; 
+  padding-bottom: 140px;
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
@@ -1942,6 +1976,24 @@ sm-popup::part(popup) {
     display: none;
   }
 
+  /* Mobile app brand adjustments */
+  .app-brand {
+    gap: 0.5rem;
+  }
+
+  .app-brand .icon {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .app-name__company {
+    font-size: 0.75rem;
+  }
+
+  .app-name__title {
+    font-size: 1rem;
+  }
+
   .header-actions {
     gap: 0.5rem;
     margin-left: auto;
@@ -2120,7 +2172,6 @@ sm-popup::part(popup) {
     position: relative;
   }
 
-  
   .mobile-title {
     display: flex;
     align-items: center;
@@ -2156,17 +2207,17 @@ sm-popup::part(popup) {
   .sidebar {
     position: fixed;
     transform: translateX(0);
-    height: calc(100vh - 80px); 
-    top: 80px; 
+    height: calc(100vh - 80px);
+    top: 80px;
     border-right: 1px solid var(--border-color);
-    border-top: none; 
+    border-top: none;
     left: 0 !important;
     z-index: 300;
     padding-top: 1rem;
   }
 
   .sidebar-header {
-    display: none; 
+    display: none;
   }
 
   .sidebar-overlay {
@@ -2179,8 +2230,8 @@ sm-popup::part(popup) {
 
   .main-content {
     padding-bottom: 2rem;
-    margin-left: 280px; 
-    margin-top: 80px; 
+    margin-left: 280px;
+    margin-top: 80px;
   }
 
   .container {

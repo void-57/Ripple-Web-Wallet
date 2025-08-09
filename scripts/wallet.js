@@ -32,23 +32,52 @@ class SearchedAddressDB {
     });
   }
 
-  async saveSearchedAddress(address, balance, timestamp = Date.now()) {
+  async saveSearchedAddress(
+    address,
+    balance,
+    timestamp = Date.now(),
+    sourceInfo = null
+  ) {
     if (!this.db) await this.init();
 
     return new Promise((resolve, reject) => {
       const transaction = this.db.transaction([this.storeName], "readwrite");
       const store = transaction.objectStore(this.storeName);
 
-      const data = {
-        address,
-        balance,
-        timestamp,
-        formattedBalance: `${balance} XRP`,
+      // First, check if this address already exists
+      const getRequest = store.get(address);
+
+      getRequest.onsuccess = () => {
+        const existingRecord = getRequest.result;
+        let finalSourceInfo = sourceInfo;
+
+        // If record exists and has sourceInfo, preserve it unless we're providing new sourceInfo
+        if (existingRecord && existingRecord.sourceInfo && !sourceInfo) {
+          finalSourceInfo = existingRecord.sourceInfo;
+        }
+        // If existing record has sourceInfo and new one doesn't, keep the existing one
+        else if (
+          existingRecord &&
+          existingRecord.sourceInfo &&
+          sourceInfo === null
+        ) {
+          finalSourceInfo = existingRecord.sourceInfo;
+        }
+
+        const data = {
+          address, // This will be the XRP address
+          balance,
+          timestamp,
+          formattedBalance: `${balance} XRP`,
+          sourceInfo: finalSourceInfo, // Contains original blockchain info if converted from private key
+        };
+
+        const putRequest = store.put(data);
+        putRequest.onsuccess = () => resolve();
+        putRequest.onerror = () => reject(putRequest.error);
       };
 
-      const request = store.put(data);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      getRequest.onerror = () => reject(getRequest.error);
     });
   }
 
@@ -799,15 +828,73 @@ function displaySearchedAddresses(addresses) {
     </div>
     <div class="searched-addresses-list">
       ${addresses
-        .map(
-          (addr) => `
-        <div class="searched-address-item">
+        .map((addr, index) => {
+          // Check if this was converted from a private key
+          const hasSourceInfo =
+            addr.sourceInfo && addr.sourceInfo.originalAddress !== addr.address;
+
+          return `
+        <div class="searched-address-item ${
+          hasSourceInfo ? "has-source-info" : ""
+        }" data-index="${index}" data-current-type="${
+            hasSourceInfo ? addr.sourceInfo.blockchain.toLowerCase() : "xrp"
+          }">
+          ${
+            hasSourceInfo
+              ? `
+          <div class="address-toggle-section">
+            <div class="address-toggle-group">
+              <button onclick="toggleAddressType(${index}, '${addr.sourceInfo.blockchain.toLowerCase()}')" 
+                      class="btn-toggle-address active" 
+                      data-type="${addr.sourceInfo.blockchain.toLowerCase()}" 
+                      title="Show ${addr.sourceInfo.blockchain} Address">
+                ${addr.sourceInfo.blockchain}
+              </button>
+              <button onclick="toggleAddressType(${index}, 'xrp')" 
+                      class="btn-toggle-address" 
+                      data-type="xrp" 
+                      title="Show XRP Address">
+                XRP
+              </button>
+            </div>
+          </div>
+          <div class="address-content-wrapper">
+            <div class="address-info">
+              <div class="address-display">
+                <div class="address-text" id="address-display-${index}" title="${
+                  addr.sourceInfo.originalAddress
+                }">
+                  ${addr.sourceInfo.originalAddress}
+                </div>
+              </div>
+            </div>
+            <div class="address-actions">
+              <button onclick="copyCurrentAddress(${index})" class="btn-copy-current" title="Copy Selected Address">
+                <i class="fas fa-copy"></i> COPY
+              </button>
+              <button onclick="deleteSearchedAddress('${
+                addr.address
+              }')" class="btn-delete" title="Delete">
+                Delete
+              </button>
+              <button onclick="recheckBalance('${
+                addr.address
+              }')" class="btn-check" title="Check balance">
+                Check balance
+              </button>
+            </div>
+          </div>
+          `
+              : `
           <div class="address-info">
-            <div class="address-text" title="${addr.address}">${addr.address}</div>
-            <div class="address-balance">${addr.formattedBalance}</div>
+            <div class="address-display">
+              <div class="address-text" id="address-display-${index}" title="${addr.address}">
+                ${addr.address}
+              </div>
+            </div>
           </div>
           <div class="address-actions">
-            <button onclick="copyAddressToClipboard('${addr.address}')" class="btn-copy" title="Copy">
+            <button onclick="copyAddressToClipboard('${addr.address}')" class="btn-copy" title="Copy XRP Address">
               <i class="fas fa-copy"></i> COPY
             </button>
             <button onclick="deleteSearchedAddress('${addr.address}')" class="btn-delete" title="Delete">
@@ -817,12 +904,95 @@ function displaySearchedAddresses(addresses) {
               Check balance
             </button>
           </div>
+          `
+          }
         </div>
-      `
-        )
+      `;
+        })
         .join("")}
     </div>
   `;
+}
+
+
+// toggle between address types in searched addresses
+async function toggleAddressType(addressIndex, type) {
+  try {
+    // Get the searched addresses list
+    const addresses = await searchedAddressDB.getSearchedAddresses();
+    if (!addresses[addressIndex]) return;
+
+    const addressItem = addresses[addressIndex];
+    const container = document.querySelector(`[data-index="${addressIndex}"]`);
+    if (!container) return;
+
+    // Update toggle button states
+    const toggleButtons = container.querySelectorAll(".btn-toggle-address");
+    toggleButtons.forEach((btn) => btn.classList.remove("active"));
+
+    const activeButton = container.querySelector(`[data-type="${type}"]`);
+    if (activeButton) {
+      activeButton.classList.add("active");
+    }
+
+    // Store the current selection in the container data
+    container.setAttribute("data-current-type", type);
+
+    // Update the displayed address text based on selection
+    const addressDisplay = container.querySelector(
+      `#address-display-${addressIndex}`
+    );
+    if (addressDisplay) {
+      if (type === "xrp") {
+        // Show XRP address
+        addressDisplay.textContent = addressItem.address;
+        addressDisplay.title = addressItem.address;
+      } else {
+        // Show original blockchain address (FLO/BTC)
+        const originalAddress =
+          addressItem.sourceInfo?.originalAddress || addressItem.address;
+        addressDisplay.textContent = originalAddress;
+        addressDisplay.title = originalAddress;
+      }
+    }
+  } catch (error) {
+    console.error("Error toggling address type:", error);
+  }
+}
+
+// copy the currently selected address
+async function copyCurrentAddress(addressIndex) {
+  try {
+    // Get the searched addresses list
+    const addresses = await searchedAddressDB.getSearchedAddresses();
+    if (!addresses[addressIndex]) return;
+
+    const addressItem = addresses[addressIndex];
+    const container = document.querySelector(`[data-index="${addressIndex}"]`);
+    if (!container) return;
+
+    // Get the current selection type
+    const currentType = container.getAttribute("data-current-type") || "flo"; // Default to original blockchain
+
+    let addressToCopy;
+    let addressLabel;
+
+    if (currentType === "xrp") {
+      addressToCopy = addressItem.address;
+      addressLabel = "XRP address";
+    } else {
+      addressToCopy =
+        addressItem.sourceInfo?.originalAddress || addressItem.address;
+      addressLabel = `${
+        addressItem.sourceInfo?.blockchain || "Original"
+      } address`;
+    }
+
+    await copyAddressToClipboard(addressToCopy, addressLabel);
+  } catch (error) {
+    console.error("Error copying current address:", error);
+    notify("Failed to copy address", "error");
+  }
 }
 
 async function deleteSearchedAddress(address) {
@@ -847,18 +1017,18 @@ async function clearAllSearchedAddresses() {
   }
 }
 
-async function copyAddressToClipboard(address) {
+async function copyAddressToClipboard(address, label = "Address") {
   try {
     await navigator.clipboard.writeText(address);
-    notify("Address copied to clipboard", "success");
+    notify(`${label} copied to clipboard`, "success");
   } catch (error) {
     console.error("Error copying to clipboard:", error);
     notify("Failed to copy address", "error");
   }
 }
 
-async function recheckBalance(address) {
-  document.getElementById("checkAddress").value = address;
+async function recheckBalance(xrpAddress) {
+  document.getElementById("checkAddress").value = xrpAddress;
   await checkBalanceAndTransactions();
 }
 
@@ -886,7 +1056,7 @@ function setTransactionFilter(filter) {
 }
 
 function filterAndDisplayTransactions() {
-  // Try to get address from either input field (for compatibility)
+  // Try to get address from either input field 
   let address = "";
 
   const checkInput = document.getElementById("checkAddress");
@@ -894,7 +1064,6 @@ function filterAndDisplayTransactions() {
   if (checkInput && checkInput.value.trim()) {
     address = checkInput.value.trim();
   } else {
-    // If no address is available, we can't filter properly
     filteredTransactions = [...allTransactions];
     displayTransactionsPage();
     updatePaginationControls();
@@ -1138,20 +1307,134 @@ function goToNextPage() {
 //combines balance checking and transaction lookup
 async function checkBalanceAndTransactions() {
   const addressInput = document.getElementById("checkAddress");
-  const address = addressInput.value.trim();
+  const userInput = addressInput.value.trim();
+  let actualXRPAddress = userInput;
+  let sourceInfo = null;
+
   try {
-    if (!address) {
-      notify("Please enter a Ripple address", "error");
+    if (!userInput) {
+      notify(
+        "Please enter an XRP address, BTC private key, or FLO private key",
+        "error"
+      );
       return;
     }
 
-    // Validate Ripple address format
+    // If it's already an XRP address, use it directly
     if (
-      !address.startsWith("r") ||
-      address.length < 25 ||
-      address.length > 34
+      userInput.startsWith("r") &&
+      userInput.length >= 25 &&
+      userInput.length <= 34
     ) {
-      notify("Invalid Ripple address format", "error");
+      actualXRPAddress = userInput;
+      
+    }
+    // Check if user is trying to enter BTC or FLO addresses (which we don't support)
+    else if (
+      userInput.startsWith("1") || // BTC Legacy address
+      userInput.startsWith("3") || // BTC Script address
+      userInput.startsWith("bc1") || // BTC Bech32 address
+      userInput.startsWith("F") // FLO address
+    ) {
+      let addressType = "";
+      if (
+        userInput.startsWith("1") ||
+        userInput.startsWith("3") ||
+        userInput.startsWith("bc1")
+      ) {
+        addressType = "Bitcoin address";
+      } else if (userInput.startsWith("F")) {
+        addressType = "FLO address";
+      }
+
+      notify(
+        `${addressType} detected. Please use private keys only, not addresses. Enter a Bitcoin private key (starting with 'L' or 'K'), FLO private key, or XRP address (starting with 'r').`,
+        "error"
+      );
+      return;
+    }
+    // Detect if input is a private key and convert to XRP address
+    else if (!userInput.startsWith("r")) {
+      try {
+        // Check if it's a Bitcoin WIF format (starts with "L" or "K")
+        if (userInput.startsWith("L") || userInput.startsWith("K")) {
+          notify(
+            "Detected Bitcoin private key - converting to XRP address...",
+            "info"
+          );
+
+          // Convert BTC WIF to XRP
+          const xrpResult = convertWIFtoRippleWallet(userInput);
+          actualXRPAddress = xrpResult.address;
+
+          // Get BTC address for source info
+          const btcResult = generateBTCFromPrivateKey(userInput);
+
+          sourceInfo = {
+            type: "Bitcoin Private Key",
+            originalKey: userInput,
+            originalAddress: btcResult ? btcResult.address : "N/A",
+            blockchain: "BTC",
+          };
+
+          notify(
+            `Converted Bitcoin key to XRP address: ${actualXRPAddress}`,
+            "success"
+          );
+        }
+        // FLO private key or other WIF format (but NOT XRP seeds)
+        else {
+          try {
+            notify(
+              "Detected FLO private key - converting to XRP address...",
+              "info"
+            );
+
+            // convert as FLO WIF
+            const xrpResult = convertWIFtoRippleWallet(userInput);
+            actualXRPAddress = xrpResult.address;
+
+            //  get FLO address for source info
+            const floResult = generateFLOFromPrivateKey(userInput);
+
+            sourceInfo = {
+              type: "FLO Private Key",
+              originalKey: userInput,
+              originalAddress: floResult ? floResult.address : "N/A",
+              blockchain: "FLO",
+            };
+
+            notify(
+              `Converted FLO private key to XRP address: ${actualXRPAddress}`,
+              "success"
+            );
+          } catch (conversionError) {
+            throw new Error(
+              "Invalid input. Please enter a valid XRP address (starting with 'r'),private key(BTC/FLO)."
+            );
+          }
+        }
+      } catch (error) {
+        notify(`Invalid input: ${error.message}`, "error");
+        return;
+      }
+    }
+    // Handle invalid XRP address format
+    else {
+      notify(
+        "Invalid XRP address format. XRP addresses should start with 'r' and be 25-34 characters long.",
+        "error"
+      );
+      return;
+    }
+
+    // Validate the final XRP address format
+    if (
+      !actualXRPAddress.startsWith("r") ||
+      actualXRPAddress.length < 25 ||
+      actualXRPAddress.length > 34
+    ) {
+      notify("Invalid or unconvertible address format", "error");
       return;
     }
 
@@ -1173,7 +1456,7 @@ async function checkBalanceAndTransactions() {
       try {
         const accountInfo = await client.request({
           command: "account_info",
-          account: address,
+          account: actualXRPAddress,
           ledger_index: "current",
         });
 
@@ -1184,13 +1467,16 @@ async function checkBalanceAndTransactions() {
         document.getElementById(
           "displayBalance"
         ).textContent = `${balance.toLocaleString()} XRP`;
-        document.getElementById("checkedAddress").textContent = address;
+        document.getElementById("checkedAddress").textContent =
+          actualXRPAddress;
 
-        // Save to IndexedDB
+        // Save to IndexedDB with source information
         try {
           await searchedAddressDB.saveSearchedAddress(
-            address,
-            balance.toLocaleString()
+            actualXRPAddress,
+            balance.toLocaleString(),
+            Date.now(),
+            sourceInfo
           );
           await updateSearchedAddressesList();
         } catch (dbError) {
@@ -1203,11 +1489,17 @@ async function checkBalanceAndTransactions() {
         if (error.data && error.data.error === "actNotFound") {
           // Account not found (not activated)
           document.getElementById("displayBalance").textContent = "0 XRP";
-          document.getElementById("checkedAddress").textContent = address;
+          document.getElementById("checkedAddress").textContent =
+            actualXRPAddress;
 
-          // Save to IndexedDB
+          // Save to IndexedDB with source information
           try {
-            await searchedAddressDB.saveSearchedAddress(address, "0");
+            await searchedAddressDB.saveSearchedAddress(
+              actualXRPAddress,
+              "0",
+              Date.now(),
+              sourceInfo
+            );
             await updateSearchedAddressesList();
           } catch (dbError) {
             console.warn("Failed to save address to IndexedDB:", dbError);
@@ -1229,7 +1521,7 @@ async function checkBalanceAndTransactions() {
       try {
         const res = await client.request({
           command: "account_tx",
-          account: address,
+          account: actualXRPAddress,
           ledger_index_min: -1,
           ledger_index_max: -1,
           limit: 1000,
@@ -1263,14 +1555,17 @@ async function checkBalanceAndTransactions() {
         //  transaction lookup address field value for filtering compatibility
         const lookupInput = document.getElementById("checkAddress");
         if (lookupInput) {
-          lookupInput.value = address;
+          lookupInput.value = actualXRPAddress;
         }
 
         // Show transaction section
         document.getElementById("transactionSection").style.display = "block";
 
+        const sourceMessage = sourceInfo
+          ? ` (converted from ${sourceInfo.blockchain} ${sourceInfo.type})`
+          : "";
         notify(
-          `Balance loaded. Found ${allTransactions.length} transactions`,
+          `Balance loaded${sourceMessage}. Found ${allTransactions.length} transactions`,
           "success"
         );
       } catch (transactionError) {
@@ -1834,6 +2129,8 @@ window.deleteSearchedAddress = deleteSearchedAddress;
 window.clearAllSearchedAddresses = clearAllSearchedAddresses;
 window.copyAddressToClipboard = copyAddressToClipboard;
 window.recheckBalance = recheckBalance;
+window.toggleAddressType = toggleAddressType;
+window.copyCurrentAddress = copyCurrentAddress;
 
 document.addEventListener("DOMContentLoaded", () => {
   initializeInputControls();

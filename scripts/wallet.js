@@ -1260,7 +1260,7 @@ async function checkBalanceAndTransactions() {
           filterAndDisplayTransactions();
         }
 
-        // Set the transaction lookup address field value for filtering compatibility
+        //  transaction lookup address field value for filtering compatibility
         const lookupInput = document.getElementById("checkAddress");
         if (lookupInput) {
           lookupInput.value = address;

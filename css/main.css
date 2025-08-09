@@ -346,7 +346,7 @@ body {
 .main-content {
   flex: 1;
   padding: 2rem;
-  padding-bottom: 140px; /* More space for mobile nav */
+  padding-bottom: 140px; 
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
@@ -2120,7 +2120,7 @@ sm-popup::part(popup) {
     position: relative;
   }
 
-  /* Show the app title in header on desktop - positioned on left */
+  
   .mobile-title {
     display: flex;
     align-items: center;
@@ -2156,17 +2156,17 @@ sm-popup::part(popup) {
   .sidebar {
     position: fixed;
     transform: translateX(0);
-    height: calc(100vh - 80px); /* Subtract header height */
-    top: 80px; /* Position below unified header */
+    height: calc(100vh - 80px); 
+    top: 80px; 
     border-right: 1px solid var(--border-color);
-    border-top: none; /* Remove top border since header provides separation */
+    border-top: none; 
     left: 0 !important;
     z-index: 300;
     padding-top: 1rem;
   }
 
   .sidebar-header {
-    display: none; /* Hide sidebar header since title is now in main header */
+    display: none; 
   }
 
   .sidebar-overlay {
@@ -2179,8 +2179,8 @@ sm-popup::part(popup) {
 
   .main-content {
     padding-bottom: 2rem;
-    margin-left: 280px; /* Account for sidebar width */
-    margin-top: 80px; /* Account for header height */
+    margin-left: 280px; 
+    margin-top: 80px; 
   }
 
   .container {
